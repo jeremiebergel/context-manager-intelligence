@@ -9,7 +9,7 @@ jobs:
         python: ["3.10", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
@@ -30,7 +30,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
@@ -58,7 +58,7 @@ jobs:
           echo "CMI_HOME=$RUNNER_TEMP/cmi-distribution-home" >> "$GITHUB_ENV"
           echo "HERMES_HOME=$RUNNER_TEMP/cmi-distribution-hermes-home" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       # Keep the exact minimum synchronized with pyproject.toml. No isolation:
