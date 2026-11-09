@@ -159,6 +159,23 @@ run their own agent binary, so they go through the proxy like the CLIs:
 A third-party harness has no `cmi_recall` tool, so each stub also names the original's file path
 (readable with any file-read tool), and `GET /cmi/<key>` serves it.
 
+**Background service:** `cmi-proxy install-service` starts the proxy at login (loopback only,
+`--openai-upstream` set for ChatGPT logins) and writes the two editor settings above, backed up in
+`~/.cmi/backups`; `cmi-proxy uninstall-service` removes both, `cmi-proxy status` checks them. No admin
+rights are needed on macOS and Linux; on Windows that is the design, but CI runs it as an administrator
+so the no-admin case is not verified yet:
+
+| OS | Service | Logs |
+|---|---|---|
+| macOS | LaunchAgent `~/Library/LaunchAgents/com.cmi.proxy.plist` | `~/.cmi/logs` |
+| Linux | systemd user unit `~/.config/systemd/user/cmi-proxy.service`, `Restart=on-failure` | `journalctl --user -u cmi-proxy` |
+| Windows | Scheduled Task `cmi-proxy` at logon (`pythonw`, no console); if Windows refuses it, `cmi-proxy.cmd` in the Startup folder | none |
+
+On Linux the install stops with an error and changes nothing when `systemctl --user` is unavailable
+(containers without systemd, WSL1): run `cmi-proxy` yourself there. The user unit runs while you are
+logged in; `loginctl enable-linger` keeps it running without a session. With the Windows Startup-folder
+fallback, `uninstall-service` cannot stop the running proxy: it stops at sign-out.
+
 Python ≥ 3.10, standard library only.
 
 ### Hermes Agent (native plugin)

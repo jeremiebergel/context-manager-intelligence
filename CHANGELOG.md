@@ -2,6 +2,16 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.11.2 (2026-11-09)
+
+- `cmi-proxy install-service` / `uninstall-service` / `status` now also run on Linux (systemd user unit,
+  verified on Debian 12: install, restart after a crash, uninstall; refuses cleanly and changes nothing
+  without `systemctl --user`) and Windows (Scheduled Task at logon, Startup-folder script if Windows
+  refuses it; install/uninstall round trip runs in Windows CI under an administrator account, the
+  no-admin case is not verified yet). VS Code settings are found at each OS's own path.
+- Community: GitHub Discussions, contributing guide, PR template, code of conduct.
+- CI: actions/checkout v7, actions/setup-python v7.
+
 ## 1.11.1 (2026-11-09)
 
 - Files the user names in the current message stay whole within a budget (`CMI_HOT_FILE_TOKENS`,

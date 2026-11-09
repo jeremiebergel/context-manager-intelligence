@@ -8,8 +8,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python: ["3.10", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
@@ -29,8 +29,8 @@ jobs:
     name: "windows (install, tests, demo)"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
@@ -40,6 +40,18 @@ jobs:
       - run: python bench/public_demo.py
       - run: cmi-proxy --help
       - run: cmi-proxy status
+      # Real Scheduled Task round trip (the runner account is an administrator, so this proves the
+      # schtasks quoting and startup, not the no-admin case).
+      - name: install-service round trip
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmi-proxy install-service
+          python -c "import urllib.request,time; time.sleep(5); print(urllib.request.urlopen('http://127.0.0.1:8787/cmi-health', timeout=5).read())"
+          schtasks //Query //TN cmi-proxy
+          cmi-proxy status
+          cmi-proxy uninstall-service
+          python -c "import subprocess,sys; sys.exit(subprocess.run(['schtasks','/Query','/TN','cmi-proxy'],capture_output=True).returncode == 0)"
 
   distribution:
     name: minimum-backend build / wheel install / sdist tests
@@ -57,8 +69,8 @@ jobs:
         run: |
           echo "CMI_HOME=$RUNNER_TEMP/cmi-distribution-home" >> "$GITHUB_ENV"
           echo "HERMES_HOME=$RUNNER_TEMP/cmi-distribution-hermes-home" >> "$GITHUB_ENV"
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       # Keep the exact minimum synchronized with pyproject.toml. No isolation:

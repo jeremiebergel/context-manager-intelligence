@@ -49,7 +49,7 @@ waits 100 requests before rewriting a warm cache.
 
 <p align="center"><img alt="The longer the session, the more CMI saves" src="docs/cost-vs-length.svg" width="760"></p>
 
-## Install in two minutes (macOS)
+## Install in two minutes (macOS, Linux; Windows in preview)
 
 ```bash
 uv tool install "git+https://github.com/jeremiebergel/context-manager-intelligence"   # or pipx / a venv
@@ -105,10 +105,12 @@ audit is a favourable case (many large, old file reads); these sessions had no r
 show what CMI removes, not a difference in answer quality.
 
 Tested: Claude Code (CLI and VS Code extension), Codex CLI and Hermes on macOS; install, `cmi-proxy status`,
-the offline demo and the full test suite on Linux (Debian, Python 3.12). `install-service` is macOS-only for now
-(on Linux and Windows, run `cmi-proxy` yourself). Windows is covered by the test suite in CI on every push
+the offline demo and the full test suite on Linux (Debian, Python 3.12). `install-service` uses a LaunchAgent on
+macOS, a systemd user unit on Linux (install, restart after a crash and uninstall verified on Debian 12) and a
+logon Scheduled Task on Windows (install round trip run in Windows CI as an administrator; the no-admin case is not verified yet); see
+[docs/REFERENCE.md](docs/REFERENCE.md#install). Windows is covered by the test suite in CI on every push
 (project memory included; file privacy relies on the NTFS permissions of your user profile instead of POSIX
-modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.11.1**; the context engine and proxy are the supported scope.
+modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.11.2**; the context engine and proxy are the supported scope.
 
 ## Project memory across sessions and models *(experimental, on by default in Hermes)*
 
