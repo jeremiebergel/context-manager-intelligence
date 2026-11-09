@@ -17,9 +17,10 @@ Free, open source, and it runs on your own computer.</p>
 ## In plain words
 
 When you work with an AI assistant like Claude Code or Codex, every new message sends the **whole
-conversation** back to the AI: every file it opened an hour ago, every test it already ran, every old
-screenshot. Most of that is no longer useful, but it still counts against your plan, again and again.
-That is why long sessions hit the limit so fast.
+conversation** back to the AI: files it opened an hour ago, tests it already ran, old screenshots.
+Most of that is no longer useful, but it still counts against your plan, again and again. Some tools now
+clear part of it once the conversation gets very long; until then, and in most other tools, it all goes
+back every time.
 
 CMI sits between you and the AI and **folds the old pages**. Recent work stays open. Old things become a
 short note, like a sticky note on a folder. If the AI needs one of them again, it unfolds it and gets the
@@ -36,8 +37,22 @@ original back, exactly as it was. Nothing is thrown away.
   conversation can be found again in a later one, even after switching from Claude to ChatGPT. If a
   decision changes, the new version replaces the old one.
 
-<sub>Measured on 26 real work sessions of the author, with Claude and GPT models. Your sessions will differ:
-you can measure your own (see below).</sub>
+<sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 9 Claude
+Code sessions replayed the same way: 20% less sent. Your sessions will differ: you can measure your own
+(see below).</sub>
+
+## Doesn't Claude already do this?
+
+Partly, and it is worth knowing what each one does:
+
+| | Claude's own tools | CMI |
+|---|---|---|
+| Old results | Claude Code and the Claude API can **clear** old results once the conversation is long: they are replaced by "content cleared", and the AI has to redo the work to see them again | **Folded** into a short note, and the AI can get the **exact original back** in one step |
+| Cost | On the API, clearing rewrites the AI's cache (you pay for that) and you choose the thresholds yourself | Computes for each fold whether the saving pays for the cache rewrite, and waits otherwise |
+| Memory | Claude Code remembers your project (CLAUDE.md, auto memory), **for Claude** | One project memory **shared by different AIs**: decide with Claude, continue with ChatGPT *(experimental, Hermes Agent)* |
+| Which AI | Claude | Claude, GPT, and any AI with a compatible connection |
+
+They can work together: if Claude Code has already cleared something, CMI simply has less to fold.
 
 ## Is it safe?
 
