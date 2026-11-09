@@ -22,7 +22,7 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 </table>
 <p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.11.1, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
 
-<p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4"><img alt="Watch the 60-second demo video" src="docs/demo-video-poster.png" width="760"></a><br><sub>▶ <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4">Watch the 60-second demo</a> (MP4, no sound)</sub></p>
+<p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4"><img alt="CMI in 60 seconds" src="docs/demo-video.gif" width="100%"></a><br><sub>60-second demo, plays automatically · <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4">MP4 version</a></sub></p>
 
 <p align="center"><img alt="cmi-proxy status and the offline demo" src="docs/demo.gif" width="760"></p>
 
