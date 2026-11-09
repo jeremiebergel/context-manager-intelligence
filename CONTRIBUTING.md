@@ -3,6 +3,21 @@
 Thanks for helping. CMI changes what an agent sends to a model, so correctness and privacy come
 before features.
 
+## Before you write code
+
+| Change | What to do |
+|---|---|
+| Typo, docs, small bug fix with a test | Open the PR directly |
+| New rule, new client, new platform, or more than a couple of files | Start a thread in [Discussions → Ideas](https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/ideas) or comment on the issue first |
+
+A large PR nobody asked for will probably be closed, however good it is: a five-minute discussion
+saves you hours. Issues labelled [`good first issue`](https://github.com/jeremiebergel/context-manager-intelligence/labels/good%20first%20issue)
+are scoped and ready to take: comment "I'll take it" so nobody duplicates the work.
+
+Not a coder? Running CMI on your own sessions and posting the numbers in
+[Discussions → Show and tell](https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/show-and-tell)
+(good or bad) is one of the most useful contributions: it is how we find the sessions where CMI loses.
+
 ## Setup
 
 ```bash
@@ -34,8 +49,16 @@ that checks every gateway RPC the console calls really exists.
 
 ## Pull requests
 
-Small, focused PRs with tests. Describe what you verified and how. Security issues: please do
-not open a public issue — see [SECURITY.md](SECURITY.md).
+- **One change per PR**, with tests. Over about 800 changed lines, split it.
+- Target `main`. CI runs on Linux, macOS (Python 3.10, 3.12, 3.13) and Windows; it must be green.
+- Fill in the template: what, why, how, and what you ran to verify it.
+- **AI-assisted code is welcome; unread code is not.** PRs that look like raw model output (bulk
+  rewrites nobody asked for, changes across many files, code the author clearly has not read) are
+  closed. You are responsible for every line you submit.
+- **Privacy gate.** `tests/test_public_hygiene.py` rejects home paths and personal e-mails. Never
+  paste real session transcripts, ids or project names into tests or bench results.
+- Security issues: please do not open a public issue — see [SECURITY.md](SECURITY.md).
+- By contributing you agree your work is released under the MIT licence.
 
 ## Maintenance and support
 

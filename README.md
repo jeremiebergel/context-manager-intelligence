@@ -9,6 +9,8 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 <img alt="python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
 <img alt="LLM calls: 0" src="https://img.shields.io/badge/LLM%20calls-0-brightgreen">
 <img alt="about 20 ms per request" src="https://img.shields.io/badge/overhead-~20%20ms%2Freq-brightgreen">
+<a href="https://github.com/jeremiebergel/context-manager-intelligence/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/jeremiebergel/context-manager-intelligence/actions/workflows/ci.yml/badge.svg"></a>
+<a href="https://github.com/jeremiebergel/context-manager-intelligence/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/jeremiebergel/context-manager-intelligence?label=discussions"></a>
 </p>
 
 <table align="center">
@@ -145,6 +147,20 @@ Local only (`127.0.0.1`, foreign `Host` headers refused); your credentials pass 
 read or stored; secrets are detected and never written to the recall store; files are private (0600).
 Shortened contents are kept in plain files under `~/.cmi/cmi_store` (or your Hermes home) so they can be
 restored; any program that can read your home folder can read them. Details in [SECURITY.md](SECURITY.md).
+
+## Community
+
+CMI is young and built in the open. The most useful things you can do right now:
+
+- **Try it and post your numbers** in [Show and tell](https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/show-and-tell),
+  including sessions where it did nothing or cost more: those are the ones we learn from.
+- **Ask anything** in [Q&A](https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/q-a);
+  propose features in [Ideas](https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/ideas).
+- **Pick a [good first issue](https://github.com/jeremiebergel/context-manager-intelligence/labels/good%20first%20issue)**:
+  Windows testers, new clients (Cursor, Aider…), Linux distributions, docs.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before a large PR, and the [code of conduct](CODE_OF_CONDUCT.md).
+
+If CMI saves you tokens, a ⭐ helps other people find it.
 
 ## More
 

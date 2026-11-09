@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Question or help
+    url: https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/q-a
+    about: Ask in Discussions (setup, numbers you see, how something works).
+  - name: Idea or proposal
+    url: https://github.com/jeremiebergel/context-manager-intelligence/discussions/categories/ideas
+    about: Talk about a feature before opening an issue or a large PR.
   - name: Security vulnerability
     url: https://github.com/jeremiebergel/context-manager-intelligence/security/advisories/new
     about: Report privately. Do not open a public issue.
