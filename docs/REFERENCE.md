@@ -209,8 +209,6 @@ degrade); a missing symbol is worth an issue.
 
 ## CMI Console (Hermes Desktop control center)
 
-![CMI Console overview (demo data)](docs/console.png)
-
 A Hermes Desktop page that shows, in one place, what you need when you run agents on
 subscriptions:
 
