@@ -1,0 +1,5 @@
+name: cmi
+version: 1.11.0
+description: "Context Manager Intelligence — deterministic, zero-LLM context engine. Shrinks every request (old tool results to digests, stale screenshots evicted, old write_file/patch payloads, duplicate results, small-result batches, stale narration) while keeping every tool_call/tool_result pair and a byte-stable prompt-cache prefix. Compaction is delegated to the built-in ContextCompressor. Provider/model-agnostic, no dependencies."
+author: Mistogan7JB
+requires_hermes: ">=0.21"

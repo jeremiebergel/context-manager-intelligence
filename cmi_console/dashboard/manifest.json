@@ -1,0 +1,8 @@
+{
+  "name": "cmi_console",
+  "label": "CMI Console",
+  "description": "Read-only control center: AI accounts, quotas, sessions per project and CMI savings.",
+  "icon": "Gauge",
+  "version": "0.1.0",
+  "api": "plugin_api.py"
+}

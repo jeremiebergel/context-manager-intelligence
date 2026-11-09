@@ -1,0 +1,8 @@
+name: cmi_review
+version: 0.1.0
+description: "CMI review — every non-trivial code change is re-read by a second model (never the one that wrote it). Findings are injected into the next turn for the working model to verify and fix, and logged to a ledger (writer, reviewer, task category) to learn which model fails on which kind of work."
+author: Mistogan7JB
+requires_hermes: ">=0.21"
+provides_hooks:
+  - post_llm_call
+  - pre_llm_call

@@ -1,0 +1,5 @@
+include LICENSE README.md SECURITY.md PROVENANCE.md ROADMAP.md CONTRIBUTING.md CHANGELOG.md
+include PROJECT_MEMORY.md PROJECT_BINDING.md RELEASE_CHECKLIST.md
+recursive-include tests *.py
+# conftest.py is deliberately included: it isolates stores from real user data.
+global-exclude __pycache__ *.py[cod] .DS_Store

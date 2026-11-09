@@ -1,0 +1,7 @@
+name: cmi_console
+version: 0.1.0
+description: "CMI Console — control center inside Hermes Desktop: AI accounts and their real quota windows, cooldowns and errors, one-click switch between named Anthropic accounts, sessions and cost per project, CMI context savings. Never returns or writes a credential."
+author: Mistogan7JB
+requires_hermes: ">=0.22"
+provides_hooks:
+  - post_api_request

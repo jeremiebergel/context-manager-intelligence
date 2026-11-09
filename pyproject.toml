@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=78.1.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cmi-context"
+dynamic = ["version"]
+description = "Deterministic context engine for AI agents: recoverable context trimming and project memory."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mistogan7JB" }]
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["llm", "agents", "context", "prompt-cache", "tokens", "anthropic", "openai", "proxy"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+cmi-proxy = "cmi.proxy:main"
+
+[project.urls]
+Homepage = "https://github.com/jeremiebergel/context-manager-intelligence"
+Issues = "https://github.com/jeremiebergel/context-manager-intelligence/issues"
+
+[tool.setuptools]
+packages = ["cmi", "cmi_review"]
+
+[tool.setuptools.package-data]
+cmi = ["plugin.yaml"]
+cmi_review = ["plugin.yaml"]
+
+[tool.setuptools.dynamic]
+version = { attr = "cmi.__version__" }
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+# Correctness gate only (syntax errors, undefined names, unused imports/variables).
+# Style is not enforced yet; see docs/audit-2026-11-03.md.
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests import pytest fixtures from sibling modules by name.
+"tests/*" = ["F401", "F811"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib -p no:cacheprovider"
+testpaths = ["tests"]

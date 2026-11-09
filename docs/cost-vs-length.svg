@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="470" viewBox="0 0 760 470" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="760" height="470" rx="12" fill="#0d1117"/>
+<text x="24" y="32" fill="#f0f6fc" font-size="18" font-weight="700">The longer the session, the more CMI saves</text>
+<text x="24" y="52" fill="#8b949e" font-size="12">Each dot is one real session. CMI does not rewrite a warm cache before a session has run 100 requests.</text>
+<line x1="70" y1="390.0" x2="730" y2="390.0" stroke="#21262d" stroke-width="1"/>
+<text x="62" y="394.0" fill="#8b949e" font-size="11" text-anchor="end">−40%</text>
+<line x1="70" y1="326.0" x2="730" y2="326.0" stroke="#21262d" stroke-width="1"/>
+<text x="62" y="330.0" fill="#8b949e" font-size="11" text-anchor="end">−30%</text>
+<line x1="70" y1="262.0" x2="730" y2="262.0" stroke="#21262d" stroke-width="1"/>
+<text x="62" y="266.0" fill="#8b949e" font-size="11" text-anchor="end">−20%</text>
+<line x1="70" y1="198.0" x2="730" y2="198.0" stroke="#21262d" stroke-width="1"/>
+<text x="62" y="202.0" fill="#8b949e" font-size="11" text-anchor="end">−10%</text>
+<line x1="70" y1="134.0" x2="730" y2="134.0" stroke="#58606b" stroke-width="1.5"/>
+<text x="62" y="138.0" fill="#8b949e" font-size="11" text-anchor="end">0%</text>
+<line x1="70" y1="70.0" x2="730" y2="70.0" stroke="#21262d" stroke-width="1"/>
+<text x="62" y="74.0" fill="#8b949e" font-size="11" text-anchor="end">+10%</text>
+<text x="102.9" y="410" fill="#8b949e" font-size="11" text-anchor="middle">10</text>
+<text x="265.1" y="410" fill="#8b949e" font-size="11" text-anchor="middle">30</text>
+<text x="442.8" y="410" fill="#8b949e" font-size="11" text-anchor="middle">100</text>
+<text x="604.9" y="410" fill="#8b949e" font-size="11" text-anchor="middle">300</text>
+<text x="400.0" y="430" fill="#8b949e" font-size="12" text-anchor="middle">requests in the session (log scale)</text>
+<line x1="442.8" y1="64" x2="442.8" y2="390" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="448.8" y="78" fill="#58a6ff" font-size="11.5">start-up phase ends</text>
+<circle cx="684.1" cy="333.9" r="11.8" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="629.0" cy="239.7" r="11.5" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="623.4" cy="335.1" r="8.5" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="592.1" cy="306.1" r="7.6" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="559.2" cy="330.9" r="7.4" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="548.0" cy="351.7" r="7.2" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="531.2" cy="330.1" r="6.8" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="489.3" cy="298.4" r="6.5" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="519.4" cy="279.8" r="6.4" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="468.5" cy="265.1" r="6.3" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="496.6" cy="236.8" r="6.1" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="470.9" cy="277.7" r="6.0" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="484.9" cy="271.4" r="5.7" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="340.5" cy="134.0" r="5.6" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="454.1" cy="134.0" r="5.5" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="445.7" cy="235.5" r="5.5" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="436.8" cy="134.0" r="5.3" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="359.8" cy="345.6" r="5.1" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="374.6" cy="134.0" r="5.0" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="279.2" cy="134.0" r="5.0" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="351.8" cy="345.8" r="5.0" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="303.8" cy="134.0" r="4.8" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="254.9" cy="134.0" r="4.8" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="318.2" cy="361.9" r="4.7" fill="#3fb950" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="311.2" cy="134.0" r="4.6" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<circle cx="287.8" cy="134.0" r="4.5" fill="#8b949e" fill-opacity="0.75" stroke="#0d1117" stroke-width="1"/>
+<text x="70" y="456" fill="#8b949e" font-size="11">Dot size = tokens in the session. Sessions of 100+ requests: 15, median −23%. Under 100 requests: untouched, unless the provider cache already expired (free rewrite).</text></svg>

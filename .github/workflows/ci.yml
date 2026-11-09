@@ -1,0 +1,90 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  standalone:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pip install "ruff==0.17.*" && ruff check .
+      - run: python -m pytest -q
+        env:
+          CMI_STANDALONE: "1"
+      - run: python bench/proxy_e2e.py
+      - run: python bench/public_demo.py
+      - run: cmi-proxy --help
+      - name: Console bundle matches source and UI harness passes
+        run: |
+          python console-ui/build.py --check
+          node tests/console_switch.test.mjs
+
+  windows:
+    name: "windows (install, tests, demo)"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python -m pytest -q
+        env:
+          CMI_STANDALONE: "1"
+      - run: python bench/public_demo.py
+      - run: cmi-proxy --help
+      - run: cmi-proxy status
+
+  distribution:
+    name: minimum-backend build / wheel install / sdist tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.13"]
+    env:
+      CMI_STANDALONE: "1"
+    steps:
+      # `runner` is not available in job-level env: set isolated homes from a step.
+      - name: Isolated CMI/Hermes homes
+        shell: bash
+        run: |
+          echo "CMI_HOME=$RUNNER_TEMP/cmi-distribution-home" >> "$GITHUB_ENV"
+          echo "HERMES_HOME=$RUNNER_TEMP/cmi-distribution-hermes-home" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # Keep the exact minimum synchronized with pyproject.toml. No isolation:
+      # otherwise a newer backend could silently mask a broken declared minimum.
+      - run: python -m pip install build twine pytest wheel "setuptools==78.1.1"
+      - run: python -m build --no-isolation
+      - run: python -m twine check --strict dist/*
+      - name: Check artifact metadata, license and isolated source fixture
+        run: python -m pytest -q tests/test_distribution.py
+        env:
+          CMI_DIST_DIR: ${{ github.workspace }}/dist
+      - name: Install wheel and smoke-test outside the checkout
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/cmi-wheel-venv"
+          "$RUNNER_TEMP/cmi-wheel-venv/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/cmi-wheel-venv/bin/python" -m pip check
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/cmi-wheel-venv/bin/python" -I -c 'import cmi, cmi_review; import importlib.metadata as m; assert m.metadata("cmi-context")["License-Expression"] == "MIT"; print(cmi.__file__)'
+          "$RUNNER_TEMP/cmi-wheel-venv/bin/cmi-proxy" --help
+      - name: Install source distribution and run its shipped standalone suite
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/cmi-sdist-venv"
+          "$RUNNER_TEMP/cmi-sdist-venv/bin/python" -m pip install pytest dist/*.tar.gz
+          "$RUNNER_TEMP/cmi-sdist-venv/bin/python" -m pip check
+          python -c 'import glob, os, tarfile; tarfile.open(glob.glob("dist/*.tar.gz")[0]).extractall(os.path.join(os.environ["RUNNER_TEMP"], "cmi-sdist-source"))'
+          cd "$RUNNER_TEMP"/cmi-sdist-source/*
+          "$RUNNER_TEMP/cmi-sdist-venv/bin/python" -m pytest -q
