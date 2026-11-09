@@ -1,8 +1,7 @@
 <h1 align="center">CMI — Context Manager Intelligence</h1>
 
-<p align="center"><b>Make your Claude or ChatGPT subscription last longer, and pay less on the API.</b><br>
-A coding agent re-sends the whole conversation on every request. CMI sends only what matters now.
-Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every shortened result comes back byte-exact.</p>
+<p align="center"><b>Make your AI coding plan last longer.</b><br>
+Free, open source, and it runs on your own computer.</p>
 
 <p align="center">
 <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-blue">
@@ -13,6 +12,63 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 <a href="https://github.com/jeremiebergel/context-manager-intelligence/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/jeremiebergel/context-manager-intelligence?label=discussions"></a>
 </p>
 
+<p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4"><img alt="CMI in 60 seconds" src="docs/demo-video.gif" width="100%"></a><br><sub>60-second demo, plays automatically · <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4">MP4 version</a></sub></p>
+
+## In plain words
+
+When you work with an AI assistant like Claude Code or Codex, every new message sends the **whole
+conversation** back to the AI: every file it opened an hour ago, every test it already ran, every old
+screenshot. Most of that is no longer useful, but it still counts against your plan, again and again.
+That is why long sessions hit the limit so fast.
+
+CMI sits between you and the AI and **folds the old pages**. Recent work stays open. Old things become a
+short note, like a sticky note on a folder. If the AI needs one of them again, it unfolds it and gets the
+original back, exactly as it was. Nothing is thrown away.
+
+## What you get
+
+- **About 28% less sent to the AI on average**, up to 42% on a single session. On long sessions measured
+  live, almost half (49%) less.
+- **The same plan goes about 1.4× further.** You hit your usage limit later.
+- **If you pay per use, a lower bill:** about 24% less on average, and none of the 26 sessions we measured
+  cost more than without CMI.
+- **It remembers your project** *(experimental, in Hermes Agent for now)*: decisions taken in one
+  conversation can be found again in a later one, even after switching from Claude to ChatGPT. If a
+  decision changes, the new version replaces the old one.
+
+<sub>Measured on 26 real work sessions of the author, with Claude and GPT models. Your sessions will differ:
+you can measure your own (see below).</sub>
+
+## Is it safe?
+
+- It runs **only on your computer**. Nothing is sent anywhere except to the AI you already use.
+- It uses **no extra AI** to decide what to fold: plain rules, the same result every time.
+- Your passwords and API keys pass through untouched; CMI never stores them.
+- Free and open source (MIT licence): anyone can read the code.
+
+## Does it work with my tools?
+
+Claude Code (terminal and VS Code), Codex and Hermes Agent: yes, tested. Other assistants that let you
+change their server address (Cline, Aider, OpenCode…) should work too. On macOS and Linux it installs in
+two commands; Windows is in preview.
+
+```bash
+uv tool install "git+https://github.com/jeremiebergel/context-manager-intelligence"
+cmi-proxy install-service
+```
+
+Then keep working as usual. `cmi-proxy uninstall-service` removes everything and puts your settings back.
+
+---
+
+# Technical details
+
+Everything below is for developers: how it works, the full measurements and their method, installation
+for every client, and troubleshooting.
+
+<p align="center"><b>A coding agent re-sends the whole conversation on every request. CMI sends only what matters now.</b><br>
+Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every shortened result comes back byte-exact.</p>
+
 <table align="center">
 <tr><td align="center"><b>28%</b><br>fewer tokens sent<br><sub>on average, up to 42%</sub></td>
 <td align="center"><b>1.4×</b><br>further on the same<br>subscription budget</td>
@@ -21,8 +77,6 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 <td align="center"><b>49%</b><br>fewer tokens sent<br><sub>live, 195-request sessions</sub></td></tr>
 </table>
 <p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.11.1, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
-
-<p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4"><img alt="CMI in 60 seconds" src="docs/demo-video.gif" width="100%"></a><br><sub>60-second demo, plays automatically · <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-16x9.mp4">MP4 version</a></sub></p>
 
 <p align="center"><img alt="cmi-proxy status and the offline demo" src="docs/demo.gif" width="760"></p>
 
