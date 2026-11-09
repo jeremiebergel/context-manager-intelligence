@@ -44,6 +44,13 @@ from .toolcalls import (  # noqa: F401 (re-exported: tests and plugins import th
 # term found in more results than this is too common to point at one of them.
 LEXICAL_RECALL_TOKENS = 12000
 LEXICAL_MAX_RESULTS = 2
+# Files the user names come back in full, newest first, up to this many tokens per request (the
+# newest one always, whatever its size). Without a cap a message listing 125 paths kept all 125
+# reads raw for the whole turn and CMI saved 0% (long live test, 2026-11-09).
+try:
+    HOT_FILE_TOKENS = int(os.environ.get("CMI_HOT_FILE_TOKENS", "32000"))
+except ValueError:  # a bad value must not break the engine import
+    HOT_FILE_TOKENS = 32000
 _TERM_RE = re.compile(
     r"`([^`\n]{4,80})`"                               # `quoted code`
     r"|[\"«“]([^\"»”\n]{6,80})[\"»”]"                    # "quoted text"
@@ -174,6 +181,7 @@ class CMIEngine(ContextEngine):
         self._superseded_now: Dict[int, str] = {}
         self._must_refresh: set = set()
         self._hot_hit = False
+        self._hot_hits: set = set()
         # Every original the engine takes out of a request is kept verbatim here; its key goes
         # into the stub, so nothing the model saw is ever lost (see store.py).
         self.store = RecallStore()
@@ -816,6 +824,7 @@ class CMIEngine(ContextEngine):
         hot_files = KnownIndex(self._hot_files(msgs, user_idx))
         self._superseded_now = self._superseded(msgs, last_user_idx)
         self._lexical_hits = self._lexical_recall(msgs, user_idx, tool_results, horizon=last_user_idx)
+        self._hot_hits = self._hot_results(msgs, tool_results, hot_files, horizon=last_user_idx)
 
         new_list: Optional[List[Dict[str, Any]]] = None
         # A read made obsolete by a later edit is re-rendered at the next tier or cold cache, not
@@ -1281,6 +1290,25 @@ class CMIEngine(ContextEngine):
             self.telemetry["lexical_recalls"] = self.telemetry.get("lexical_recalls", 0) + len(chosen)
         return chosen
 
+    def _hot_results(self, msgs, tool_results, hot_files, horizon) -> set:
+        """Results of files the user names, read BEFORE the current user message, newest first:
+        the newest always, then older ones until one does not fit in HOT_FILE_TOKENS. A message
+        naming dozens of files would otherwise pin every read raw; the rest stay recoverable
+        with cmi_recall. Results of the current turn are raw anyway (user anchor) and do not
+        count, so the set is fixed for the whole turn (prompt cache), like _lexical_recall."""
+        if not hot_files:
+            return set()
+        chosen, budget = set(), HOT_FILE_TOKENS
+        for idx in sorted((i for i in tool_results if i < horizon), reverse=True):
+            if not match_known(extract_paths(tool_results[idx].tool_args or ""), hot_files):
+                continue
+            cost = _tokens_rough(self._content_text(msgs[idx]))
+            if chosen and cost > budget:
+                break
+            chosen.add(idx)
+            budget -= cost
+        return chosen
+
     def _paths_in_tool_args(self, msgs) -> List[str]:
         """Cold start (engine just loaded on an existing session): the paths the agent touched."""
         out = []
@@ -1313,8 +1341,9 @@ class CMIEngine(ContextEngine):
             relevance_priority = self._hot_hit = True
         if hot_files and not relevance_priority:
             # The result OF a file the user is talking about (its path is in the call's args)
-            # comes back in full — the model must not work from a digest of it.
-            relevance_priority = self._hot_hit = bool(match_known(extract_paths(info.tool_args or ""), hot_files))
+            # comes back in full — the model must not work from a digest of it (within the
+            # HOT_FILE_TOKENS budget, see _hot_results).
+            relevance_priority = self._hot_hit = idx in self._hot_hits
         criticality = ToolResultLifecycle.criticality_of(info.tool_name, content_text)
         represented = info.instance_id in self.lifecycle._represented
         referenced = self.lifecycle.is_referenced(info.instance_id)

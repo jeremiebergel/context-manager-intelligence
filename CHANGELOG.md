@@ -2,6 +2,18 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.11.1 (2026-11-09)
+
+- Files the user names in the current message stay whole within a budget (`CMI_HOT_FILE_TOKENS`,
+  default 32000; newest first, the newest always; fixed for the whole turn so the prompt cache holds).
+  A message listing 125 file paths used to keep every read raw: 0% saved on a 125-request live session,
+  28.7% on its offline replay with the cap.
+- Live: 6 Hermes sessions on Claude Sonnet 5.5, about 195 requests each: 49% fewer tokens sent,
+  modelled cost −27%. Replay of the 26 real sessions with this version: tokens −28%, modelled cost −24%
+  (the 1.11.0 table rounded −24.6% to −25%), 0 of 26 costlier.
+- Publication gate: private names are read from a file outside the repository
+  (`~/.config/cmi/private-terms.txt` or `$CMI_PRIVATE_TERMS`), required by the export script.
+
 ## 1.11.0 — first public release (2026-11-09)
 
 Measured on 26 real coding sessions, replayed with the provider's cache expiry: 28% fewer tokens on

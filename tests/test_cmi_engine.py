@@ -585,6 +585,74 @@ def test_28_user_names_old_file_full_content_same_request(monkeypatch):
         assert out[3]["content"] == content, spelling
 
 
+def test_28b_many_named_files_are_capped(monkeypatch):
+    """A message naming dozens of files must not pin every read raw (live test 2026-11-09: 125
+    named paths -> 0% saved). The newest named reads stay full within HOT_FILE_TOKENS; the
+    oldest are digested and keep their recall key."""
+    monkeypatch.setattr("cmi.engine.WARMUP_REQUESTS", 0)
+    monkeypatch.setattr("cmi.engine.HOT_FILE_TOKENS", 5000)
+    paths = [f"/home/dev/project/src/mod_{i}.py" for i in range(12)]
+    content = lambda i: "".join(f"def f{i}_{k}(x):\n    return x * {k}  # module {i}\n" for k in range(120))  # noqa: E731
+    msgs = [{"role": "system", "content": "sys"}, {"role": "user", "content": "start"}]
+    for i, p in enumerate(paths):
+        msgs.append({"role": "assistant", "content": "", "tool_calls": [{"id": f"c{i}", "type": "function",
+                     "function": {"name": "read_file", "arguments": json.dumps({"path": p})}}]})
+        msgs.append({"role": "tool", "tool_call_id": f"c{i}", "content": content(i)})
+    for t in range(30):
+        msgs += [{"role": "user", "content": f"autre chose {t}"}, {"role": "assistant", "content": f"ok {t}"}]
+    e = make_engine()
+    e.on_turn_complete(msgs)
+    e.select_context(msgs)
+    turn = msgs + [{"role": "user", "content": "relis tout ça:\n" + "\n".join(paths)}]
+    out = e.select_context(turn) or turn
+    full = [i for i in range(12) if out[3 + 2 * i]["content"] == content(i)]
+    assert full and len(full) < 12, full
+    assert full == list(range(12 - len(full), 12))  # the newest ones
+    assert 11 in full  # the newest is always kept, whatever the budget
+
+
+def test_28c_single_named_file_over_budget_still_full(monkeypatch):
+    monkeypatch.setattr("cmi.engine.WARMUP_REQUESTS", 0)
+    monkeypatch.setattr("cmi.engine.HOT_FILE_TOKENS", 10)
+    path = "/home/dev/project/src/auth/session.ts"
+    e = make_engine()
+    msgs, content = _read_history(path)
+    e.on_turn_complete(msgs)
+    e.select_context(msgs)
+    turn = msgs + [{"role": "user", "content": f"reprends {path}"}]
+    out = e.select_context(turn) or turn
+    assert out[3]["content"] == content
+
+
+def test_28d_named_set_fixed_for_the_turn(monkeypatch):
+    """A named file read DURING the turn must not change which older named reads stay raw:
+    a digest turning raw mid-turn rewrites the cache from that message on."""
+    monkeypatch.setattr("cmi.engine.WARMUP_REQUESTS", 0)
+    monkeypatch.setattr("cmi.engine.HOT_FILE_TOKENS", 1000)
+
+    def body(tag, n):
+        return "".join(f"def {tag}_{k}(x):\n    return x * {k}  # {tag}\n" for k in range(n))
+
+    def call(i, p, c):
+        return [{"role": "assistant", "content": "", "tool_calls": [{"id": f"c{i}", "type": "function",
+                 "function": {"name": "read_file", "arguments": json.dumps({"path": p})}}]},
+                {"role": "tool", "tool_call_id": f"c{i}", "content": c}]
+    x, y, z = "/home/dev/p/src/x.py", "/home/dev/p/src/y.py", "/home/dev/p/src/z.py"
+    cx, cy, cz = body("x", 60), body("y", 150), body("z", 8)   # ~535, ~1370, ~68 tokens
+    msgs = [{"role": "system", "content": "sys"}, {"role": "user", "content": "start"}]
+    msgs += call(0, x, cx) + call(1, y, cy)
+    for t in range(30):
+        msgs += [{"role": "user", "content": f"autre {t}"}, {"role": "assistant", "content": f"ok {t}"}]
+    e = make_engine()
+    e.on_turn_complete(msgs)
+    e.select_context(msgs)
+    turn = msgs + [{"role": "user", "content": f"regarde {x} {y} {z}"}]
+    first = (e.select_context(turn) or turn)[3]["content"]
+    for i in (9, 10):
+        turn = turn + call(i, z, cz + "#" * i)
+        assert (e.select_context(turn) or turn)[3]["content"] == first
+
+
 def test_29_digest_names_the_file():
     """A digest must say WHICH file it stands for, so the model can re-read it."""
     path = "/home/dev/project/src/very/deeply/nested/module/name/handler.ts"

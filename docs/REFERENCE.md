@@ -47,19 +47,24 @@ Every `tool_call` keeps its `tool_result`, the output is byte-identical from one
 Compaction (summarizing the conversation when the window fills up) is still done by Hermes's
 built-in compressor. CMI just makes it happen later and less often.
 
-## Measured results (CMI 1.11.0)
+## Measured results (CMI 1.11.1)
 
-26 real coding sessions (Claude Opus/Sonnet and GPT-6 models, several projects, 572M tokens), replayed
+26 real coding sessions (Claude Opus/Sonnet and GPT-6 models, several projects, 636M tokens), replayed
 request by request with `bench/cost_replay.py`, which models the provider's cache (cache read 0.1x, write
 1.25x, 5-minute expiry). Weighted by tokens:
 
 | Measure | Average | Median | Best |
 |---|---:|---:|---:|
-| Tokens sent | −28% | −21% | −42% |
+| Tokens sent | −28% | −22% | −42% |
 | Same token budget goes further | 1.4x | | 1.7x |
-| Modelled API cost | −25% | −21% | −36% |
+| Modelled API cost | −24% | −21% | −36% |
 | 15 sessions of 100+ requests: tokens | −29% | −28% | −38% |
 | 15 sessions of 100+ requests: modelled API cost | −25% | −23% | −34% |
+
+Live (2026-11-09): 6 Hermes sessions on Claude Sonnet 5.5, about 195 requests each, a read-only audit of
+191 project files (188M tokens): 49% fewer tokens sent (48% to 55%), modelled cost −27% (−25% to −32%).
+A task message that lists every file path keeps those files whole (named files); since 1.11.1 they are
+capped by `CMI_HOT_FILE_TOKENS` (default 32000, newest first, fixed for the turn).
 
 No session costs more with CMI (17 cheaper, 9 untouched); all sessions of 100+ requests are cheaper. Until a session has
 made 100 requests CMI does not rewrite a warm provider cache (no tier, no refresh of stale reads or named
