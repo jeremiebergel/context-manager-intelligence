@@ -22,7 +22,15 @@ def _broken_upstream():
                 c, _ = s.accept()
             except OSError:
                 return
-            c.recv(65536)
+            # Read the WHOLE request first: closing with unread bytes makes Windows send a RST,
+            # which the proxy would see before the status line (a 502, not a mid-stream cut).
+            data = b""
+            c.settimeout(5)
+            while b"}]}" not in data:
+                part = c.recv(65536)
+                if not part:
+                    break
+                data += part
             c.sendall(b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n"
                       b"5\r\nhello\r\n")
             c.close()
