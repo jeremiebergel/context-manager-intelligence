@@ -28,18 +28,21 @@ original back, exactly as it was. Nothing is thrown away.
 
 ## What you get
 
-- **About 28% less sent to the AI on average**, up to 42% on a single session. On long sessions measured
-  live, almost half (49%) less.
-- **The same plan goes about 1.4× further.** You hit your usage limit later.
-- **If you pay per use, a lower bill:** about 24% less on average, and none of the 26 sessions we measured
-  cost more than without CMI.
+- **About 28% fewer tokens sent to the AI on average**, up to 42% on a single session. On long sessions
+  measured live, almost half (49%) fewer.
+- **Longer sessions on the same plan: about 1.4× further.** You hit your usage limit later, and the
+  context window fills up later.
+- **Nothing lost.** Every shortened result is stored and comes back byte for byte when the AI asks.
+- **A safety rule, not a selling point: CMI is built never to cost more.** It rewrites the provider's cache
+  only when the rewrite pays back, and leaves short sessions untouched. On Hermes (26 real sessions) none
+  cost more; the modelled API cost also came out about 24% lower. See the Claude Code limits below.
 - **It remembers your project** *(experimental, in Hermes Agent for now)*: decisions taken in one
   conversation can be found again in a later one, even after switching from Claude to ChatGPT. If a
   decision changes, the new version replaces the old one.
 
-<sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 9 Claude
-Code sessions replayed the same way: 20% less sent. Your sessions will differ: you can measure your own
-(see below).</sub>
+<sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 14 Claude
+Code sessions replayed the same way: 2% to 26% fewer tokens on sessions over 150 requests, shorter ones untouched (see "Known limit" below). Your sessions will
+differ: you can measure your own (see below).</sub>
 
 ## Doesn't Claude already do this?
 
@@ -104,7 +107,7 @@ cuts what each request carries, so the same limit covers more work and the conte
 - On sessions of 100+ requests: **29% fewer tokens on average**, 38% at best.
 - **Live, on long sessions: 49% fewer tokens sent** (6 Hermes sessions of about 195 requests each on Claude Sonnet 5.5, 188M tokens: 48% to 55% per session).
 
-## API: a lower bill
+## API: never a higher bill
 
 With prompt caching, shortening old content only pays if the cache rewrite is repaid by later requests.
 CMI prices every rewrite against the provider's cache rules and acts only when it pays back, and it
@@ -174,6 +177,19 @@ a fresh home). Tokens sent are counted by CMI on the actual requests. Every agen
 when it needed a file it had received shortened, it got it back in full with `cmi_recall`. A read-only
 audit is a favourable case (many large, old file reads); these sessions had no run without CMI, so they
 show what CMI removes, not a difference in answer quality.
+
+**Known limit: live Claude Code (2026-11-10).** One run per arm, same task (a 103-file read-only audit,
+Sonnet 5.5): with CMI 11.5% less was sent, but the billed cost was $5.16 against $4.50 without CMI (+15%),
+because of more cache-write tokens (642K against 435K). A second, three-step pair showed +7%. The offline
+replay of 14 real Claude Code sessions (107 to 2,441 requests) priced with the 1-hour cache Claude Code
+requests (write = 2x input) showed the same thing before the fix: 4 of 14 cost more (+3% to +12%, all of 111
+to 538 requests). **Fix (2026-11-10):** behind the proxy (Claude Code, Codex) CMI now waits 150 requests before
+it rewrites anything and uses a stricter payback horizon. Same 14 sessions after the fix: none costs
+meaningfully more (worst +0.3%), 0 invariant violations, every stub recalled byte-exact; the 8 sessions of
+107 to 208 requests are left untouched (0% saved), and the longer ones save 2% to 26% of tokens (modelled
+cost −16% on the 2,441-request one). So on Claude Code CMI is for longer sessions; short ones are left alone.
+The live A/B has not been re-run with the fix yet. Tune with `CMI_PROXY_WARMUP_REQUESTS` (100 saves more tokens
+on short sessions but 3 to 4 of the 14 then cost more) and `CMI_PROXY_TIER_LINDY`. Check `cmi-proxy status` against your own bill.
 
 Tested: Claude Code (CLI and VS Code extension), Codex CLI and Hermes on macOS; install, `cmi-proxy status`,
 the offline demo and the full test suite on Linux (Debian, Python 3.12). `install-service` uses a LaunchAgent on

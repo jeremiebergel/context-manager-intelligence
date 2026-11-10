@@ -4,7 +4,7 @@ Implements the ``ContextEngine`` contract (agent.context_engine.ContextEngine)
 as a deterministic, provider/model-agnostic context SELECTION layer.
 Compaction is fully delegated to the built-in ContextCompressor.
 """
-__version__ = "1.11.4"
+__version__ = "1.11.5"
 
 from .capabilities import ModelCapabilities
 from .lifecycle import ToolResultLifecycle

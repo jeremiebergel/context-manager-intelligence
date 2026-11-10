@@ -11,8 +11,9 @@ loop sends them), compiles each one exactly like cmi-proxy does, and checks on E
   stable     compiling the same request twice gives the same bytes (prompt cache)
   recall     every cmi:key in a stub returns the exact original from the store
 
-and reports tokens not sent plus an Anthropic prompt-cache cost estimate (read 0.1x, write 1.25x)
-with and without CMI.
+and reports tokens not sent plus an Anthropic prompt-cache cost estimate (read 0.1x, write 2x for the 1-hour cache)
+with and without CMI (write ratio: CMI_WRITE_RATIO, default 2.0 = the 1-hour cache Claude Code
+requests; set 1.25 for the 5-minute rate).
 
     python bench/claude_code_replay.py                   # 4 largest sessions
     python bench/claude_code_replay.py path/to/session.jsonl
@@ -23,6 +24,7 @@ import json
 import sys
 import tempfile
 import time
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -31,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 from cmi import proxy  # noqa: E402
 from cmi.store import KEY_RE, RecallStore  # noqa: E402
 
+WRITE_RATIO = float(os.environ.get("CMI_WRITE_RATIO", "2.0"))
 PROJECTS = Path.home() / ".claude" / "projects"
 
 
@@ -204,7 +207,7 @@ def replay(path: Path, max_requests: int = 0) -> Dict[str, Any]:
                 p = _prefix(prev[kind], ser)
                 cached = sum(sizes[:p]) // 4
                 fresh = sum(sizes[p:]) // 4
-                cost[kind] += cached * 0.1 + fresh * 1.25
+                cost[kind] += cached * 0.1 + fresh * WRITE_RATIO
                 prev[kind] = ser
             raw_tok += _tokens(req["messages"])
             cmi_tok += _tokens(out)

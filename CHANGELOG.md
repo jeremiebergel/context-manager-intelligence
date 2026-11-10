@@ -2,6 +2,17 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.11.5 (2026-11-10)
+
+- Proxy (Claude Code, Codex): waits 150 requests (was 100) before rewriting the cache and uses a stricter payback
+  horizon (0.2). Replay of 14 real Claude Code sessions at the 1-hour cache price: 4 sessions cost more
+  (+3% to +12%) before, none meaningfully after (worst +0.3%); sessions under 150 requests are left untouched.
+  Hermes keeps its own settings. Tune with `CMI_PROXY_WARMUP_REQUESTS` / `CMI_PROXY_TIER_LINDY`.
+- Shortened results keep one flagged line per distinct error template, with a repeat count, so repeated errors
+  no longer hide a different failure.
+- `bench/claude_code_replay.py` prices writes at 2x by default (`CMI_WRITE_RATIO`).
+- README: Claude Code limit stated; headline is fewer tokens and longer sessions, cost is a guard-rail.
+
 ## 1.11.4 (2026-11-10)
 
 - Every user-facing text is in English by default (Hermes plugin catalog review): the `/cmi` command and

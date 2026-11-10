@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 from .compat import default_home
-from .engine import CMIEngine
+from .engine import CMIEngine, PROXY_TIER_LINDY, PROXY_WARMUP_REQUESTS
 from .store import RecallStore
 from .wire import strip_cache_control, to_canonical
 
@@ -144,6 +144,8 @@ class Sessions:
             if entry is None:
                 eng = CMIEngine()
                 eng.recall_via_file = True
+                eng.tier_lindy = min(eng.tier_lindy, PROXY_TIER_LINDY)
+                eng.warmup_requests = max(eng.warmup_requests, PROXY_WARMUP_REQUESTS)
                 eng.on_session_start(key, hermes_home=self.home)
                 eng.update_model(model=model or "unknown", context_length=DEFAULT_CONTEXT)
                 entry = (eng, threading.Lock(), [0])  # [0] = message count at the last user turn learned

@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # ---- Tunable coefficients -----------------------------------------------
 TR_RECENCY_CURRENT: float = 1.0
@@ -36,6 +36,7 @@ CRITICAL_TOOLS = {
 _ERROR_MARKERS = ("error", "fail", "exception", "traceback", "fatal", "panic")
 # Line-level twin of _ERROR_MARKERS for digest excerpts: word-start match, so "terror" or
 # "unfailing" stay out but FAILED, Errors, panicked get in.
+_TEMPLATE_VARIABLE = re.compile(r"0x[0-9a-f]+|[0-9a-f]{8,}|\d+")
 _ERROR_LINE = re.compile(r"(?i)\b(?:error|fail|exception|traceback|fatal|panic)")
 
 # ---- Tool-call ARGUMENT degradation (v1.1) --------------------------------
@@ -250,26 +251,43 @@ class ToolResultLifecycle:
         return f"{rest}{flagged}"[:budget_chars]
 
     @staticmethod
+    def _error_template(line: str) -> str:
+        """Line with its numbers, hex ids and whitespace folded: 240 'error: foo at line 12..251'
+        lines are one template, so a distinct error further down is not crowded out by repeats."""
+        return " ".join(_TEMPLATE_VARIABLE.sub("#", line.lower()).split())
+
+    @staticmethod
     def _flagged_lines(content: str, cap: int) -> str:
-        """Up to `cap` chars of error-looking lines, as `\\n[flagged] L<n>: <line> | ...`."""
+        """Up to `cap` chars of error-looking lines, as `\\n[flagged] L<n>: <line> | ...`.
+
+        One line per distinct error template (the first occurrence, with ` (xN)` when it repeats):
+        a log that repeats one error hundreds of times still shows every other kind of failure."""
         if cap < 40:
             return ""
-        out = ""
+        seen: Dict[str, List[Any]] = {}  # template -> [line no, line, marker start, count]; insertion order = first seen
         for no, line in enumerate(content[:200_000].splitlines(), 1):
             m = _ERROR_LINE.search(line)
             if not m:
                 continue
+            slot = seen.get(ToolResultLifecycle._error_template(line))
+            if slot is None:
+                seen[ToolResultLifecycle._error_template(line)] = [no, line, m.start(), 1]
+            else:
+                slot[3] += 1
+        out = ""
+        for no, line, mstart, count in seen.values():
             head = f"{out} | " if out else "\n[flagged] "
             label = f"L{no}: "
-            room = min(160, cap - len(head) - len(label))
+            tail = f" (x{count})" if count > 1 else ""
+            room = min(160, cap - len(head) - len(label) - len(tail))
             if room < 30:
                 break
             text = line.strip()
             if len(text) > room:  # keep a window around the marker, not just the line's start
-                pos = m.start() - (len(line) - len(line.lstrip()))
+                pos = mstart - (len(line) - len(line.lstrip()))
                 start = max(0, min(pos - room // 4, len(text) - room))
                 text = text[start:start + room]
-            out = f"{head}{label}{text}"
+            out = f"{head}{label}{text}{tail}"
         return out
 
     @staticmethod

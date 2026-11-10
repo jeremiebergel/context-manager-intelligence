@@ -111,6 +111,11 @@ TIER_LINDY = float(os.environ.get("CMI_TIER_LINDY", "0.35"))  # 0.5 (replay 2026
 # ("quality beats cache") ignored the payback rule: in a replay of 26 real sessions three short ones
 # (41-63 requests) cost +16% to +20% because of them. A cold cache is still compiled (rewriting is free).
 WARMUP_REQUESTS = int(os.environ.get("CMI_WARMUP_REQUESTS", "100"))
+# Through the proxy (Claude Code, Codex: 1-hour cache, write = 2x input) a rewrite is dearer and sessions of
+# 100-130 requests are common: replay of 14 real Claude Code sessions, 4 cost more with a 100-request wait
+# (+3% to +12%), none with 150 (those sessions are then left untouched).
+PROXY_TIER_LINDY = float(os.environ.get("CMI_PROXY_TIER_LINDY", "0.2"))  # 0.35 left a 538-request Claude Code session at +3.3% cost, 0.2: -0.2%
+PROXY_WARMUP_REQUESTS = int(os.environ.get("CMI_PROXY_WARMUP_REQUESTS", "150"))
 SUPERSEDED_FORCES_REFRESH = os.environ.get("CMI_SUPERSEDED_REFRESH", "0") == "1"
 
 
@@ -188,6 +193,8 @@ class CMIEngine(ContextEngine):
         self.cache_ttl_s = CACHE_TTL_S
         self._last_req_t: Optional[float] = None
         self._cold = False
+        self.tier_lindy = TIER_LINDY
+        self.warmup_requests = WARMUP_REQUESTS  # the proxy raises it (PROXY_WARMUP_REQUESTS)
         self._requests = 0
         self._last_fps: List[int] = []
         self._adopted = False
@@ -978,7 +985,7 @@ class CMIEngine(ContextEngine):
         # Quality beats cache: a message the current turn needs in full (a file the user names)
         # or whose content is now wrong (a read superseded by a later edit) always takes its
         # fresh rendering, even if that rewrites the cache from there.
-        warming = self._requests <= WARMUP_REQUESTS and not self._cold
+        warming = self._requests <= self.warmup_requests and not self._cold
         # While warming up nothing is refreshed: a session that may stop soon cannot repay a cache
         # rewrite, and CMI must never cost more than sending nothing. A shortened result stays
         # recoverable by its key (cmi_recall), also for a file the user names.
@@ -1055,12 +1062,12 @@ class CMIEngine(ContextEngine):
         premium = self.cost.write - self.cost.read
         if premium <= 0:
             return True
-        if TIER_LINDY <= 0:  # legacy rule (<= 1.11): fixed horizon, savings not priced as reads
+        if self.tier_lindy <= 0:  # legacy rule (<= 1.11): fixed horizon, savings not priced as reads
             return delta * TIER_PAYBACK_REQUESTS >= rewrite * premium
         # Priced rule: removed tokens would have been cache reads on every later request; a
         # session that has run n requests is expected to run about n more (Lindy), so short
         # sessions do not pay for tiers they will never amortize.
-        expected = TIER_LINDY * max(1, self._requests)
+        expected = self.tier_lindy * max(1, self._requests)
         return delta * self.cost.read * expected >= rewrite * premium
 
     # -- Helpers --------------------------------------------------------------

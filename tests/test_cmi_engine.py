@@ -1260,3 +1260,17 @@ def test_one_hour_cache_tightens_the_payback_rule():
     assert e._tier_pays_back(delta, rewrite)
     e.cache_ttl_s = 3600
     assert not e._tier_pays_back(delta, rewrite)
+
+
+def test_22c_excerpt_keeps_one_line_per_distinct_error_template():
+    """240 repeats of one warning-style error must not crowd out the one different failure at the
+    bottom (a lint run with 3 errors among 240 warnings): one flagged line per template, with a count."""
+    from cmi.lifecycle import ToolResultLifecycle as LifecycleManager  # noqa: N814
+    noisy = [f"src/a{n}.py:{n}:1: error: unused import 'os{n}' (0x{n:04x})" for n in range(240)]
+    rare = ["tests/test_x.py:9: FAILED assertion boom", "Traceback (most recent call last):"]
+    content = "\n".join(noisy + ["ok line"] * 40 + rare)
+    ex = LifecycleManager._distributed_excerpt(content, 400)
+    assert len(ex) <= 400
+    assert "FAILED assertion boom" in ex and "Traceback" in ex
+    assert "(x240)" in ex  # the repeated template shows once, with its count
+    assert ex.count("unused import") <= 4  # the 3 samples plus the flagged template, not 240 lines
