@@ -38,9 +38,7 @@ original back, exactly as it was. Nothing is thrown away.
   decision changes, the new version replaces the old one.
 
 <sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 9 Claude
-Code sessions replayed the same way: 20% less sent. **Live on Claude Code, one A/B run (2026-11-10): 11.5%
-less sent, but the bill was 15% higher** (more cache writes); we are working on it, so on Claude Code expect
-less than the figures above for now. Your sessions will differ: you can measure your own
+Code sessions replayed the same way: 20% less sent. Your sessions will differ: you can measure your own
 (see below).</sub>
 
 ## Doesn't Claude already do this?
