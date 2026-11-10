@@ -13,7 +13,7 @@ export function createConsole({ React, api, storage, notify, initial, post, swit
   const { createElement: h, useState, useEffect, useCallback, useMemo, useRef } = React
   const store = storage || { get: (_k, d) => d, set: () => {} }
 
-  const FR = typeof navigator !== 'undefined' && String(navigator.language || '').toLowerCase().startsWith('fr')
+  const FR = String(store.get('lang', '') || '').toLowerCase() === 'fr'  // English by default; French is opt-in (stored setting 'lang' = 'fr')
   const T = FR ? {
     title: 'Control Center', overview: "Vue d'ensemble", accounts: 'Comptes', projects: 'Projets', savings: 'Économies CMI', security: 'Sécurité',
     refresh: 'Actualiser', auto: 'Live', privacy: 'Mode capture', synced: 'Synchronisé', never: 'jamais',

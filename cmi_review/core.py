@@ -13,6 +13,7 @@ Android TV change: a broken nav stack, an unfiltered spoiler and an unwired butt
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
@@ -386,13 +387,18 @@ def format_injection(review: dict) -> str:
     return "\n".join(lines)
 
 
+
+def fr() -> bool:
+    """English by default; French with CMI_LANG=fr (opt-in)."""
+    return os.environ.get("CMI_LANG", "").lower().startswith("fr")
+
 def ledger_summary(rows: list[dict], days: int = 30, now: Optional[float] = None) -> str:
     """Per (writer, category) totals: how often each model's work needed a fix."""
     import time as _t
     now = now or _t.time()
     rows = [r for r in rows if r.get("kind") == "review" and now - float(r.get("t", 0)) <= days * 86400]
     if not rows:
-        return f"CMI review : aucune relecture sur {days} j."
+        return f"CMI review : aucune relecture sur {days} j." if fr() else f"CMI review: no reviews over {days} d."
     agg: dict[tuple[str, str], list[int]] = {}
     for r in rows:
         key = (str(r.get("writer", "?")), str(r.get("category", "other")))
@@ -401,11 +407,14 @@ def ledger_summary(rows: list[dict], days: int = 30, now: Optional[float] = None
         c = r.get("counts") or {}
         a[1] += 1 if (c.get("high", 0) + c.get("medium", 0)) else 0
         a[2] += int(c.get("high", 0))
-    out = [f"CMI review — {len(rows)} relecture(s) sur {days} j", "", "| auteur | catégorie | relectures | avec problème | high |", "|---|---|---|---|---|"]
+    out = ([f"CMI review — {len(rows)} relecture(s) sur {days} j", "", "| auteur | catégorie | relectures | avec problème | high |"]
+           if fr() else [f"CMI review — {len(rows)} review(s) over {days} d", "", "| writer | category | reviews | with issues | high |"])
+    out.append("|---|---|---|---|---|")
     for (w, cat), (n, bad, high) in sorted(agg.items(), key=lambda kv: -kv[1][0]):
         out.append(f"| {w} | {cat} | {n} | {bad} ({round(100 * bad / n)} %) | {high} |")
     last = rows[-1]
     c = last.get("counts") or {}
-    out += ["", f"Dernière : {last.get('project') or '?'} · {last.get('category')} · {last.get('writer')} relu par {last.get('reviewer')} → "
-                f"{c.get('high', 0)} high, {c.get('medium', 0)} medium, {c.get('low', 0)} low"]
+    out += ["", (f"Dernière : {last.get('project') or '?'} · {last.get('category')} · {last.get('writer')} relu par {last.get('reviewer')} → "
+                 if fr() else f"Last: {last.get('project') or '?'} · {last.get('category')} · {last.get('writer')} reviewed by {last.get('reviewer')} → ")
+            + f"{c.get('high', 0)} high, {c.get('medium', 0)} medium, {c.get('low', 0)} low"]
     return "\n".join(out)

@@ -64,6 +64,7 @@ class _Stream:
 class CostShadow:
     def __init__(self) -> None:
         self.read, self.write, self.price = DEFAULT_READ_RATIO, DEFAULT_WRITE_RATIO, None
+        self._write_5m, self._ttl_s = self.write, 300.0
         self.reset()
 
     def reset(self) -> None:
@@ -73,6 +74,16 @@ class CostShadow:
 
     def set_pricing(self, model: str, provider: str = "") -> None:
         self.read, self.write, self.price = cache_ratios(model, provider)
+        self._write_5m = self.write
+        self.set_cache_ttl(getattr(self, "_ttl_s", 300.0))
+
+    def set_cache_ttl(self, seconds: float) -> None:
+        """Anthropic prices a 1-hour cache write at 2x the input price, a 5-minute one at 1.25x
+        (Claude Code asks for 1 h). Scale the write premium accordingly: 1.25 -> 2.0. Providers
+        without a write premium (write <= 1) are unchanged."""
+        self._ttl_s = float(seconds or 300.0)
+        base = getattr(self, "_write_5m", self.write)
+        self.write = 1 + (base - 1) * 4 if (self._ttl_s >= 3600 and base > 1) else base
 
     def observe(self, raw_fps, raw_toks, out_fps, out_toks, cold: bool = False) -> None:
         # cold: the provider cache expired since the last request (TTL), for both streams.

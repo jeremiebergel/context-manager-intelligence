@@ -127,6 +127,20 @@ def _hermes_cache_ttl(default: float) -> float:
 class CMIEngine(ContextEngine):
     """Deterministic context selection + delegated compaction."""
 
+    @property
+    def cache_ttl_s(self) -> float:
+        return self._cache_ttl_s
+
+    @cache_ttl_s.setter
+    def cache_ttl_s(self, seconds: float) -> None:
+        # The TTL decides both when the cache is cold and what a cache write costs (1 h = 2x input
+        # on Anthropic, 5 min = 1.25x): a tier priced at the 5-minute rate under a 1-hour cache
+        # under-estimates its rewrite by ~65% (seen live on Claude Code, which asks for 1 h).
+        self._cache_ttl_s = float(seconds)
+        cost = self.__dict__.get("cost")
+        if cost is not None:
+            cost.set_cache_ttl(self._cache_ttl_s)
+
     def __init__(self, *, auto_project_binding=None) -> None:
         # ABC-required token state
         self.last_prompt_tokens: int = 0

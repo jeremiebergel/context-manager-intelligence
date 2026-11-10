@@ -30,7 +30,7 @@ loss of quality or memory.** Cheaper bills are a bonus, never the headline.
   that calls an LLM). Every turn that changes code is re-read by a second model, never the writer
   (Opus → Sonnet, anything else → Opus by default). Findings are injected into the next turn as
   "not verified, check before fixing", and every review lands in `cmi_reviews.jsonl` (writer,
-  reviewer, task category, findings): the data a per-task model router needs. `/relecture` shows it.
+  reviewer, task category, findings): the data a per-task model router needs. `/cmi-review` shows it.
 
 ## Next
 

@@ -90,7 +90,7 @@ showed no regressions against running without CMI.
 mean a lower bill: shortening an old message invalidates the cached prefix after it. Cache tiers
 (v1.4+) only rewrite the prefix when the saving pays the rewrite back within a few requests, so
 long sessions end cheaper while short ones can end costlier (see the warning above; `/cmi` shows
-both costs per session). On flat-rate plans and providers without prompt caching, token savings
+both costs per session, in English; set `CMI_LANG=fr` for French). On flat-rate plans and providers without prompt caching, token savings
 translate into runway, but actual quotas, rate limits and billing differ.
 
 ## Install

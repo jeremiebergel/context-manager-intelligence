@@ -82,20 +82,44 @@ def _fmt_tokens(n: float) -> str:
     return f"{n / 1e6:.1f} M" if n >= 1e6 else f"{n / 1e3:.0f} k" if n >= 1e3 else f"{int(n)}"
 
 
-def report(ledger: StatsLedger, current_session: str = "", live: Optional[Dict[str, Any]] = None) -> str:
+_TEXT = {
+    "en": dict(session="This session", today="Today", d7="Last 7 days", d30="Last 30 days",
+               title="**CMI — context savings**",
+               head="| Period | Requests | Tokens without CMI | Saved | Real cost without → with CMI* |",
+               partial=" (partial)", unknown="price unknown",
+               recalls="Recalls over 7 days: {rc} via `cmi_recall`, {lx} anticipated (no tool call).",
+               note="*Input cost simulated request by request with the provider's cache (read/write at the "
+                    "model's public price), with and without CMI. On a subscription, the difference is extra quota."),
+    "fr": dict(session="Cette session", today="Aujourd'hui", d7="7 derniers jours", d30="30 derniers jours",
+               title="**CMI — économies de contexte**",
+               head="| Période | Requêtes | Tokens sans CMI | Économisés | Coût réel sans → avec CMI* |",
+               partial=" (partiel)", unknown="prix inconnu",
+               recalls="Rappels sur 7 jours : {rc} via `cmi_recall`, {lx} anticipés (sans appel d'outil).",
+               note="*Coût d'entrée simulé requête par requête avec le cache du fournisseur (lecture/écriture "
+                    "au tarif public du modèle), avec et sans CMI. Sur un forfait, l'écart est du quota en plus."),
+}
+
+
+def ui_lang() -> str:
+    """English by default; French with CMI_LANG=fr (opt-in)."""
+    return "fr" if os.environ.get("CMI_LANG", "").lower().startswith("fr") else "en"
+
+
+def report(ledger: StatsLedger, current_session: str = "", live: Optional[Dict[str, Any]] = None,
+           lang: Optional[str] = None) -> str:
+    T = _TEXT[lang if lang in _TEXT else ui_lang()]
     now = time.time()
-    windows = [("Cette session", lambda r: r.get("s") == current_session and current_session),
-               ("Aujourd'hui", lambda r: r.get("t", 0) >= now - (now % 86400) - time.timezone),
-               ("7 derniers jours", lambda r: r.get("t", 0) >= now - 7 * 86400),
-               ("30 derniers jours", lambda r: r.get("t", 0) >= now - 30 * 86400)]
+    windows = [("session", lambda r: r.get("s") == current_session and current_session),
+               ("today", lambda r: r.get("t", 0) >= now - (now % 86400) - time.timezone),
+               ("d7", lambda r: r.get("t", 0) >= now - 7 * 86400),
+               ("d30", lambda r: r.get("t", 0) >= now - 30 * 86400)]
     rows = list(ledger.rows())
     prices: Dict[tuple, Optional[float]] = {}
-    lines = ["**CMI — économies de contexte**", "",
-             "| Période | Requêtes | Tokens sans CMI | Économisés | Coût réel sans → avec CMI* |",
-             "|---|---|---|---|---|"]
-    for label, keep in windows:
+    lines = [T["title"], "", T["head"], "|---|---|---|---|---|"]
+    for key, keep in windows:
+        label = T[key]
         sel = [r for r in rows if keep(r)]
-        if label == "Cette session" and live and live.get("n"):
+        if key == "session" and live and live.get("n"):
             sel = sel + [live]
         raw = sum(r.get("raw", 0) for r in sel)
         out = sum(r.get("out", 0) for r in sel)
@@ -117,13 +141,11 @@ def report(ledger: StatsLedger, current_session: str = "", live: Optional[Dict[s
             c_cmi += r.get("cc", 0) * prices[m] / 1e6
         if c_raw > 0:
             delta = (c_cmi / c_raw - 1) * 100
-            cost = f"{c_raw:,.2f} $ → {c_cmi:,.2f} $ ({delta:+.0f} %)" + ("" if priced else " (partiel)")
+            cost = f"${c_raw:,.2f} → ${c_cmi:,.2f} ({delta:+.0f}%)" + ("" if priced else T["partial"])
         else:
-            cost = "prix inconnu"
-        lines.append(f"| {label} | {n} | {_fmt_tokens(raw)} | {_fmt_tokens(raw - out)} ({pct:.0f} %) | {cost} |")
+            cost = T["unknown"]
+        lines.append(f"| {label} | {n} | {_fmt_tokens(raw)} | {_fmt_tokens(raw - out)} ({pct:.0f}%) | {cost} |")
     rc = sum(r.get("rc", 0) for r in rows if r.get("t", 0) >= now - 7 * 86400)
     lx = sum(r.get("lx", 0) for r in rows if r.get("t", 0) >= now - 7 * 86400)
-    lines += ["", f"Rappels sur 7 jours : {rc} via `cmi_recall`, {lx} anticipés (sans appel d'outil).",
-              "", "*Coût d'entrée simulé requête par requête avec le cache du fournisseur (lecture/écriture "
-              "au tarif public du modèle), avec et sans CMI. Sur un forfait, l'écart est du quota en plus."]
+    lines += ["", T["recalls"].format(rc=rc, lx=lx), "", T["note"]]
     return "\n".join(lines)

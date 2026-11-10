@@ -1010,7 +1010,10 @@ def test_49_savings_ledger_and_report(tmp_path):
     e.on_turn_complete(None)  # nothing new: no empty row
     assert len(list(e.stats.rows())) == 1
     text = report(StatsLedger(tmp_path / "cmi_stats.jsonl"), "s1")
-    assert "Cette session | 1 |" in text and "30 derniers jours | 1 |" in text
+    assert "This session | 1 |" in text and "Last 30 days | 1 |" in text  # English by default
+    assert "économies" not in text
+    fr = report(StatsLedger(tmp_path / "cmi_stats.jsonl"), "s1", lang="fr")
+    assert "Cette session | 1 |" in fr and "30 derniers jours | 1 |" in fr  # French is opt-in
     assert rows[0]["cr"] > 0 and rows[0]["cc"] > 0
 
 
@@ -1234,3 +1237,26 @@ def test_63_user_pasted_image_never_evicted():
         msgs += [{"role": "assistant", "content": f"ok {t}"}, {"role": "user", "content": f"next {t}"}]
     out = make_engine().select_context(msgs) or msgs
     assert out[0] == msgs[0]
+
+
+def test_one_hour_cache_prices_writes_at_2x():
+    """Claude Code asks for a 1-hour cache: writes cost 2x input there, not 1.25x. A tier priced
+    at the 5-minute rate under-estimates its rewrite and can end costlier (seen live)."""
+    e = make_engine()
+    assert e.cost.write == pytest.approx(1.25)
+    e.cache_ttl_s = 3600
+    assert e.cost.write == pytest.approx(2.0)
+    e.cache_ttl_s = 300
+    assert e.cost.write == pytest.approx(1.25)
+    e.cache_ttl_s = 3600
+    e.cost.set_pricing("unknown-model")  # pricing reloaded: the 1 h TTL still applies
+    assert e.cost.write == pytest.approx(2.0)
+
+
+def test_one_hour_cache_tightens_the_payback_rule():
+    e = make_engine()
+    e._requests = 100
+    delta, rewrite = 4000, 10000  # 0.1*35*4000 = 14000: pays back at 1.25x (11500), not at 2x (19000)
+    assert e._tier_pays_back(delta, rewrite)
+    e.cache_ttl_s = 3600
+    assert not e._tier_pays_back(delta, rewrite)

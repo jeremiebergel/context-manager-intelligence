@@ -22,10 +22,11 @@ const fixture = { host: { name: 'test' }, sections: { accounts: { active: {}, pr
   accounts: [account('perso', 0, 'limited'), account('pro', 1, 'ready')] } }, errors: {} }
 const walk = n => !n || typeof n !== 'object' ? [] : [n, ...(n.children || []).flat(Infinity).flatMap(walk)]
 const text = n => typeof n === 'string' ? n : (n?.children || []).flat(Infinity).map(text).join('')
+const FR_STORE = { get: (k, d) => (k === 'lang' ? 'fr' : d), set: () => {} }  // French is opt-in
 let picks = []
 for (const proState of ['ready', 'limited']) {
   fixture.sections.accounts.accounts[1].state = proState
-  const render = ctx.createConsole({ React, initial: fixture, api: async () => fixture,
+  const render = ctx.createConsole({ React, initial: fixture, api: async () => fixture, storage: FR_STORE,
     post: async () => {}, switchAccount: async tag => { picks.push(tag); return 'ok' } })
   const tree = walk(render())
   const proCard = tree.find(n => n.type === 'section' && /cc-acct/.test(n.props?.className || '') && text(n).startsWith('Pro'))
@@ -42,7 +43,7 @@ for (const proState of ['ready', 'limited']) {
 {
   fixture.sections.accounts.accounts[1].state = 'ready'
   const posted = []
-  const render = ctx.createConsole({ React, initial: fixture, api: async () => fixture,
+  const render = ctx.createConsole({ React, initial: fixture, api: async () => fixture, storage: FR_STORE,
     post: async (path, body) => { posted.push([path, body]); return {} }, switchAccount: async () => 'ok' })
   const tree = walk(render())
   const labels = name => walk(tree.find(n => n.type === 'section' && /cc-acct/.test(n.props?.className || '') && text(n).startsWith(name)))
@@ -78,7 +79,7 @@ const shellCtx = vm.createContext({ React, host, navigator: { language: 'fr' },
   createConsole: opts => { options = opts; return () => null } })
 vm.runInContext(shell.replace(/^import .*$/gm, '').replace('export default', 'globalThis.plugin ='), shellCtx)
 shellCtx.plugin.register({ rest: async (path, params) => { calls.push([path, params]); return { moved: 1 } },
-  storage: {}, registerMany() {} })
+  storage: FR_STORE, registerMany() {} })
 let message = await options.switchAccount('pro')
 assert.match(message, /sélectionné pour cette conversation/)
 assert.equal(calls[1][0], '/accounts/first')
@@ -105,3 +106,12 @@ await assert.rejects(options.switchAccount('pro'), /connexion/)
 owner = { profile: 'default', connectionId: 'local' }; provider = 'anthropic'; fail = true
 await assert.rejects(options.switchAccount('pro'), /switch failed/)
 console.log('PASS: overview buttons + ready/paused Pro + click routing + session reselection + deferred notice + Codex unchanged + profile/connection isolation + RPC failure')
+
+// English by default, even on a French browser: French needs the stored setting.
+{
+  const render = ctx.createConsole({ React, initial: fixture, api: async () => fixture,
+    post: async () => {}, switchAccount: async () => 'ok' })
+  const all = walk(render()).map(n => typeof n === 'string' ? n : '').join(' ') + text({ children: [render()] })
+  assert.ok(!/Passer sur ce compte|Vue d'ensemble/.test(all), 'console must default to English')
+  assert.ok(/Switch to this account|Overview/.test(all), 'English labels expected by default')
+}

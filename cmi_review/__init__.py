@@ -8,7 +8,7 @@ Hermes adapter (general plugin, hooks):
   into the user message (one-shot) so the working model verifies and fixes them.
 - Every review is appended to ``$HERMES_HOME/cmi_reviews.jsonl`` (writer, reviewer, category,
   counts) — the ledger that tells which model fails on which kind of task.
-- ``/relecture`` shows the ledger; ``/relecture off`` / ``/relecture on`` toggle it.
+- ``/cmi-review`` (alias ``/relecture``) shows the ledger; ``off`` / ``on`` toggle it. English by default, ``CMI_LANG=fr`` for French.
 
 Config (optional) in config.yaml under ``cmi_review:`` — see core.DEFAULTS.
 """
@@ -254,11 +254,14 @@ def _review_command(raw_args: str = "") -> str:
     if arg in ("off", "stop", "disable"):
         _state_dir()
         flag.write_text("1")
-        return "CMI review désactivée. `/relecture on` pour la réactiver."
+        return ("CMI review désactivée. `/relecture on` pour la réactiver." if core.fr() else
+                "CMI review disabled. `/cmi-review on` to turn it back on.")
     if arg in ("on", "start", "enable"):
         flag.unlink(missing_ok=True)
-        return "CMI review activée : chaque changement de code est relu par un second modèle."
-    state = "activée" if _config().get("enabled", True) else "DÉSACTIVÉE"
+        return ("CMI review activée : chaque changement de code est relu par un second modèle." if core.fr() else
+                "CMI review enabled: every code change is re-read by a second model.")
+    on = _config().get("enabled", True)
+    state = ("activée" if on else "DÉSACTIVÉE") if core.fr() else ("enabled" if on else "DISABLED")
     return f"CMI review {state}.\n\n" + core.ledger_summary(_read_ledger())
 
 
@@ -281,5 +284,7 @@ def register(ctx) -> None:
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     register_command = getattr(ctx, "register_command", None)
     if callable(register_command):
-        register_command("relecture", _review_command,
-                         description="CMI review : relectures automatiques par un second modèle (on/off, stats)")
+        register_command("cmi-review", _review_command,
+                         description="CMI review: automatic re-reads of code changes by a second model (on/off, stats)")
+        register_command("relecture", _review_command,  # French alias, kept for existing users
+                         description="CMI review: alias of /cmi-review")

@@ -2,6 +2,14 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.11.4 (2026-11-10)
+
+- Every user-facing text is in English by default (Hermes plugin catalog review): the `/cmi` command and
+  savings report, the review plugin (`/cmi-review`, French alias `/relecture` kept) and the desktop
+  console. French is opt-in: `CMI_LANG=fr` for commands, the console's stored `lang` setting for the UI.
+- Cost model: a 1-hour cache write is priced at 2x the input price (was 1.25x, the 5-minute rate) in
+  tier decisions and in the cost shadow. Claude Code requests a 1-hour cache.
+
 ## 1.11.3 (2026-11-10)
 
 - Proxy: when the upstream stream breaks mid-response, the client connection is dropped at once, so the

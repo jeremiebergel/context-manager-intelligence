@@ -36,13 +36,13 @@ export default {
         const sid = host.state.focusedSessionId.get()
         const owner = host.state.focusedSessionOwner.get()
         if (sid && (!owner || owner.profile !== host.state.profile.get() || owner.connectionId !== host.state.connectionId.get())) {
-          throw new Error('Ouvre cette conversation sur sa connexion et son profil avant de changer de compte.')
+          throw new Error(String(ctx.storage?.get?.('lang', '') || '').toLowerCase() === 'fr' ? 'Ouvre cette conversation sur sa connexion et son profil avant de changer de compte.' : 'Open this conversation on its own connection and profile before switching account.')
         }
         // session.info is an event, not an RPC; read the already focused live session.
         const live = sid ? await host.request('session.activate', { session_id: sid, omit_messages: true }) : null
         const info = live && live.info
         if (sid && (!info || live.session_id !== sid)) throw new Error('Missing session route')
-        const fr = String(globalThis.navigator?.language || '').toLowerCase().startsWith('fr')
+        const fr = String(ctx.storage?.get?.('lang', '') || '').toLowerCase() === 'fr'
         if (info?.provider === 'anthropic' && !info.model) throw new Error('Missing session model')
         const selection = await ctx.rest('/accounts/first', { method: 'POST', body: { tag, intent: 'make-first', retry: true }, timeoutMs: 20000 })
         if (!selection?.moved || selection.error) throw new Error(fr ? 'Impossible de sélectionner ce compte.' : 'Could not select this account.')
