@@ -412,8 +412,15 @@ def make_handler(sessions: Sessions, anthropic: Upstream, openai: Upstream, verb
                     self.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
                     self.wfile.flush()
                 self.wfile.write(b"0\r\n\r\n")
-            except (BrokenPipeError, ConnectionResetError):
-                pass
+            except (OSError, http.client.HTTPException) as exc:  # transport only; a bug elsewhere still raises
+                # Client went away, or the upstream stream broke mid-response (IncompleteRead,
+                # bad chunk size, reset, read timeout). The status line is already sent, so the
+                # only honest signal left is to drop the connection WITHOUT the final chunk: the
+                # client sees a truncated response at once and retries, instead of waiting on a
+                # half-open socket. Never let it surface as a server traceback.
+                log.warning("cmi-proxy: upstream stream interrupted (%s %s): %s", self.command, path,
+                            exc.__class__.__name__)
+                self.close_connection = True
             finally:
                 conn.close()
 

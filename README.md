@@ -38,7 +38,9 @@ original back, exactly as it was. Nothing is thrown away.
   decision changes, the new version replaces the old one.
 
 <sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 9 Claude
-Code sessions replayed the same way: 20% less sent. Your sessions will differ: you can measure your own
+Code sessions replayed the same way: 20% less sent. **Live on Claude Code, one A/B run (2026-11-10): 11.5%
+less sent, but the bill was 15% higher** (more cache writes); we are working on it, so on Claude Code expect
+less than the figures above for now. Your sessions will differ: you can measure your own
 (see below).</sub>
 
 ## Doesn't Claude already do this?
@@ -181,7 +183,7 @@ macOS, a systemd user unit on Linux (install, restart after a crash and uninstal
 logon Scheduled Task on Windows (install round trip run in Windows CI as an administrator; the no-admin case is not verified yet); see
 [docs/REFERENCE.md](docs/REFERENCE.md#install). Windows is covered by the test suite in CI on every push
 (project memory included; file privacy relies on the NTFS permissions of your user profile instead of POSIX
-modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.11.2**; the context engine and proxy are the supported scope.
+modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.11.3**; the context engine and proxy are the supported scope.
 
 ## Project memory across sessions and models *(experimental, on by default in Hermes)*
 

@@ -2,6 +2,15 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.11.3 (2026-11-10)
+
+- Proxy: when the upstream stream breaks mid-response, the client connection is dropped at once, so the
+  client retries immediately. Before, the proxy raised an uncaught error and the client could wait on a
+  half-open socket (seen live: Claude Code retrying one request 43 times, about 15 minutes apart).
+- Measured live on Claude Code (Sonnet 5.5, 103-file audit, one run per arm, same task): with CMI 11.5%
+  less sent, 0 interruptions, but billed cost $5.16 vs $4.50 without (+15%: 642K vs 435K cache-write
+  tokens, 111 vs 107 turns). Under investigation; stated in the README.
+
 ## 1.11.2 (2026-11-09)
 
 - `cmi-proxy install-service` / `uninstall-service` / `status` now also run on Linux (systemd user unit,
