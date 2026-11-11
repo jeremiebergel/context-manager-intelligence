@@ -29,9 +29,10 @@ sys.path.insert(0, str(ROOT))
 from cmi import engine as _engine  # noqa: E402
 from cmi import proxy  # noqa: E402
 
-# This synthetic session has 30 requests: the 100-request start-up phase (no cache rewrite on a warm
-# cache) would leave it untouched, so the demo switches it off to show the mechanics.
+# This synthetic session has 30 requests: the start-up phase (100 requests in Hermes, 150 behind the proxy;
+# no cache rewrite on a warm cache) would leave it untouched, so the demo switches it off to show the mechanics.
 _engine.WARMUP_REQUESTS = 0
+proxy.PROXY_WARMUP_REQUESTS = 0
 
 ROUTE = "/v1/messages"
 
