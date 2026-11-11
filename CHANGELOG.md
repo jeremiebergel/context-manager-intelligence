@@ -11,7 +11,6 @@ Unreleased work is listed first. Dates are YYYY-MM-DD.
 - Shortened results keep one flagged line per distinct error template, with a repeat count, so repeated errors
   no longer hide a different failure.
 - `bench/claude_code_replay.py` prices writes at 2x by default (`CMI_WRITE_RATIO`).
-- README: Claude Code limit stated; headline is fewer tokens and longer sessions, cost is a guard-rail.
 
 ## 1.11.4 (2026-11-10)
 
