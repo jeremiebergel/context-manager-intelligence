@@ -11,6 +11,10 @@ Unreleased work is listed first. Dates are YYYY-MM-DD.
 - Shortened results keep one flagged line per distinct error template, with a repeat count, so repeated errors
   no longer hide a different failure.
 - `bench/claude_code_replay.py` prices writes at 2x by default (`CMI_WRITE_RATIO`).
+- Proxy: opt-in per-job tool allowlist. A job's launcher sets the header `x-cmi-tools-allow: read_file,terminal`
+  and the proxy drops the other tool schemas (about 15k tokens of a 19k-token fixed prefix on short runs). No header
+  means no change; it fails open (an allowlist matching nothing is ignored, tools already used or named by
+  `tool_choice` are kept) and the header is never forwarded upstream. Not measured live yet.
 
 ## 1.11.4 (2026-11-10)
 
