@@ -43,6 +43,7 @@ from urllib.parse import urlsplit
 from .compat import default_home
 from .engine import CMIEngine, PROXY_TIER_LINDY, PROXY_WARMUP_REQUESTS
 from .store import RecallStore
+from .toolscope import HEADER as TOOLS_HEADER, parse_allow, scope_tools
 from .wire import strip_cache_control, to_canonical
 
 log = logging.getLogger("cmi.proxy")
@@ -51,7 +52,7 @@ HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authoriza
               "trailers", "transfer-encoding", "upgrade", "host", "content-length",
               "accept-encoding"}
 # Never forwarded upstream: the proxy's own secret.
-PRIVATE_HEADERS = {"x-cmi-token"}
+PRIVATE_HEADERS = {"x-cmi-token", "x-cmi-tools-allow"}
 # The proxy's BaseHTTPRequestHandler writes its own.
 RESPONSE_DROP = {"server", "date"}
 # Headers that only make sense for one provider (credentials included).
@@ -344,7 +345,18 @@ def make_handler(sessions: Sessions, anthropic: Upstream, openai: Upstream, verb
                     body = None
                 if isinstance(body, dict):
                     t = time.perf_counter()
+                    scoped = None
+                    try:
+                        scoped = scope_tools(body, parse_allow(self.headers.get(TOOLS_HEADER)))
+                    except Exception:
+                        log.warning("CMI tool scoping failed; tools unchanged", exc_info=True)
+                    if scoped is not None:
+                        body = scoped
                     new_body, stats = compile_request(sessions, path, body)
+                    if scoped is not None and not stats.get("changed"):
+                        new_body, stats = body, {**stats, "changed": True, "session": "toolscope",
+                                                 "chars_before": len(raw), "chars_after": 0}
+                        stats["chars_after"] = len(json.dumps(body, ensure_ascii=False))
                     if stats.get("changed"):
                         try:
                             # ASCII escapes: a lone surrogate from a cut emoji survives as \udXXX.

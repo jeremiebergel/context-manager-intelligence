@@ -12,6 +12,8 @@ Free, open source, and it runs on your own computer.</p>
 <a href="https://github.com/jeremiebergel/context-manager-intelligence/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/jeremiebergel/context-manager-intelligence?label=discussions"></a>
 </p>
 
+<p align="center"><b>Accepted in the official Hermes plugin catalog</b> · in Hermes: <code>hermes plugins install cmi</code></p>
+
 <p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-v2-16x9.mp4"><img alt="CMI in under a minute" src="docs/demo-video.gif" width="100%"></a><br><sub>Under a minute, plays automatically · <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-v2-16x9.mp4">MP4 version</a></sub></p>
 
 ## In plain words
