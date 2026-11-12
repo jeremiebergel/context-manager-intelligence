@@ -4,7 +4,7 @@ Implements the ``ContextEngine`` contract (agent.context_engine.ContextEngine)
 as a deterministic, provider/model-agnostic context SELECTION layer.
 Compaction is fully delegated to the built-in ContextCompressor.
 """
-__version__ = "1.12.0"
+__version__ = "1.12.1"
 
 from .capabilities import ModelCapabilities
 from .lifecycle import ToolResultLifecycle
@@ -28,6 +28,15 @@ def register(ctx) -> None:
     register_command = getattr(ctx, "register_command", None)
     if callable(register_command):
         register_command("cmi", _cmi_command, description="CMI: tokens and cost saved (session, day, 7 d, 30 d)")
+    # Second barrier against a model copying a CMI stub into a new write (write_guard.py). Hermes
+    # runs it wherever it loads CMI with a full plugin context (plugins.enabled); fail-open.
+    register_hook = getattr(ctx, "register_hook", None)
+    if callable(register_hook):
+        try:
+            from .write_guard import refuse_stub_write
+            register_hook("pre_tool_call", refuse_stub_write)
+        except Exception:
+            pass
 
 
 def _cmi_command(raw_args: str = "") -> str:

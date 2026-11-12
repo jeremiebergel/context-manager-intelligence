@@ -13,7 +13,7 @@ import os
 import re
 import zlib
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:  # Hermes Agent
     from agent.context_engine import ContextEngine
@@ -96,9 +96,26 @@ _PDF_PAGE_RE = re.compile(rb"/Type\s*/Page(?![A-Za-z])")
 # PDF 1.5+ writers pack page objects in compressed object streams (/Type /ObjStm, Flate).
 _PDF_OBJSTM_RE = re.compile(rb"/Type\s*/ObjStm\b[^>]*>>\s*stream\r?\n")
 _PDF_FIRST_RE = re.compile(rb"/First\s+(\d+)")
+_PDF_LENGTH_RE = re.compile(rb"/Length\s+(\d+)(?!\s+\d+\s+R)")  # direct /Length only, not "/Length 12 0 R"
 _PDF_OBJ_RE = re.compile(rb"(\d+)\s+\d+\s+obj\b")
 _PDF_INFLATE_MAX = 16_000_000  # bytes inflated per document, bounds a hostile stream
 _document_tokens_cache: Dict[Any, int] = {}
+
+
+def _pdf_objstm_bytes(raw: bytes, m: "re.Match[bytes]") -> Tuple[Optional[bytes], Optional[int]]:
+    """The compressed bytes and /First of the object stream whose dictionary ends at ``m``. Its
+    dictionary is read from its own "N 0 obj" header, never from a previous object; the bytes are
+    sliced by a direct /Length (a stream may contain the text "endstream"), else up to "endstream"."""
+    owners = list(_PDF_OBJ_RE.finditer(raw, max(0, m.start() - 4096), m.start()))
+    head = raw[owners[-1].end() if owners else max(0, m.start() - 2048):m.end()]
+    first = _PDF_FIRST_RE.search(head)
+    length = _PDF_LENGTH_RE.search(head)
+    if length and m.end() + int(length.group(1)) <= len(raw):
+        data: Optional[bytes] = raw[m.end():m.end() + int(length.group(1))]
+    else:
+        end = raw.find(b"endstream", m.end())
+        data = raw[m.end():end] if end >= 0 else None
+    return data, int(first.group(1)) if first else None
 
 
 def _pdf_pages(raw: bytes) -> int:
@@ -106,34 +123,36 @@ def _pdf_pages(raw: bytes) -> int:
     number, so a page rewritten by an incremental update (arXiv stamps, signed PDFs) counts once.
     A stream that does not inflate is skipped; never raises."""
     seen: set = set()
-    for m in _PDF_PAGE_RE.finditer(raw):
-        owners = list(_PDF_OBJ_RE.finditer(raw, max(0, m.start() - 4096), m.start()))
-        seen.add(int(owners[-1].group(1)) if owners else ("raw", m.start()))
+    spans: List[Tuple[int, int]] = []  # object-stream bodies: their bytes are not visible objects
     budget = _PDF_INFLATE_MAX
     for m in _PDF_OBJSTM_RE.finditer(raw):
         if budget <= 0:
             break
-        end = raw.find(b"endstream", m.end())
-        if end < 0:
+        data, base = _pdf_objstm_bytes(raw, m)
+        if data is None:
             continue
+        spans.append((m.end(), m.end() + len(data)))
         try:
-            inflated = zlib.decompressobj().decompress(raw[m.end():end], budget)
+            inflated = zlib.decompressobj().decompress(data, budget)
         except Exception:
             continue
         budget -= len(inflated)
-        first = _PDF_FIRST_RE.search(raw, max(0, m.start() - 2048), m.end())
         try:
-            nums = [int(x) for x in inflated[:int(first.group(1))].split()] if first else []
+            nums = [int(x) for x in inflated[:base].split()] if base else []
         except ValueError:
             nums = []
-        if first and nums and len(nums) % 2 == 0:
-            base = int(first.group(1))
+        if base and nums and len(nums) % 2 == 0:
             offs = nums[1::2] + [len(inflated) - base]
             for k, num in enumerate(nums[0::2]):
                 if _PDF_PAGE_RE.search(inflated, base + offs[k], base + offs[k + 1]):
                     seen.add(num)
         else:  # header unreadable: count the matches, without dedupe
             seen.update(("packed", m.start(), i) for i, _ in enumerate(_PDF_PAGE_RE.finditer(inflated)))
+    for m in _PDF_PAGE_RE.finditer(raw):
+        if any(a <= m.start() < b for a, b in spans):
+            continue
+        owners = list(_PDF_OBJ_RE.finditer(raw, max(0, m.start() - 4096), m.start()))
+        seen.add(int(owners[-1].group(1)) if owners else ("raw", m.start()))
     return len(seen)
 
 

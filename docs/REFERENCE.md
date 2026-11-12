@@ -12,7 +12,7 @@ On every request, CMI compiles the history:
 | Tool results | Old results for files/commands you have stopped working on become a **digest** (the full path/command, plus head, tail and error lines) | Kept raw if recent, if they concern a file you are working on, or if the digest would not remove at least half. A result that contains an error scores higher (kept longer) but is not exempt: once old, it is digested and its error lines are kept in the digest (`[flagged]`, about 150 characters each, capped in total); the full original stays recoverable |
 | **Recall** | If you name a file again ("go back to `src/auth/session.ts`", "fix session.ts"), its old result comes back **in full, on the same request** (during the first 30 requests of a session it stays recoverable with `cmi_recall` instead, to protect the cache) | Matches absolute, relative or bare-name spellings |
 | Screenshots | Stale images are replaced by a text stub | Recent images are kept |
-| Tool-call payloads | Old `write_file`/`patch` contents are shortened | Never if a later message refers to that call |
+| Tool-call payloads | Old `write_file`/`patch` contents are removed from the past call, replaced by one `cmi_omitted` note (size, path, recall key) | Never if a later message refers to that call. A new call copied from it has no payload and is refused by the tool; a write whose payload is a CMI stub is blocked by the `pre_tool_call` hook (plugin enabled) |
 | Duplicates | A result identical to an earlier one becomes a reference | Only above a minimum size |
 | Small-result batches | Runs of tiny results are folded into a single summary | Only when that is shorter |
 | Narration | Old "let me look at…" filler is shortened | Never touches user messages |

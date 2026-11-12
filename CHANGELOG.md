@@ -2,6 +2,26 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.1 (2026-11-12)
+
+- Safety: a model can no longer put a CMI stub in a file by copying CMI's short form of a past write.
+  Seen live on 1.12.0: the model copied the `[CMI: content omitted ...]` stub, with an invented recall
+  key, into a NEW write, and the file got the stub instead of its content. Two barriers:
+  - a shortened past write no longer holds a stub in its payload: the payload keys (`content`,
+    `old_string`/`new_string`, `edits`, `input`...) are removed and one `cmi_omitted` note (sizes, path,
+    recall keys) is added. A call that imitates it reaches the tool without its payload, and the tool
+    refuses it ("missing content"); checked against the real Hermes `write_file` and `patch` handlers,
+    with nothing written;
+  - a `pre_tool_call` hook (`cmi/write_guard.py`) blocks a write whose payload starts with any CMI
+    stub (result digests, duplicates, batches, narration) or embeds a 1.12.0 write stub, and says how to
+    get the original back. Hermes runs it when the plugin is enabled (`plugins.enabled`, which
+    `hermes plugins install cmi` offers); checked through the real Hermes plugin loader and hook
+    dispatch. `plugin.yaml` declares `provides_hooks: [pre_tool_call]`.
+  Sessions that already use CMI re-write their cache once, at the first request on 1.12.1.
+- PDF page count: an object stream is read up to its own `/Length` (its compressed bytes can contain
+  the text "endstream", which cut it short and dropped its pages), and its `/First` is read from its own
+  dictionary, never from the previous object. 19 of 19 real PDFs still match their page count.
+
 ## 1.12.0 (2026-11-11)
 
 - Start-up phase 100 -> 30 requests in Hermes, 150 -> 30 through the proxy (Claude Code, Codex). With the

@@ -382,9 +382,11 @@ def test_20_write_file_args_degraded_when_old():
                      and any(tc.get("id") == "wc1" for tc in (m.get("tool_calls") or [])))
     tc = next(tc for tc in write_msg["tool_calls"] if tc["id"] == "wc1")
     args = json.loads(tc["function"]["arguments"])
-    assert "content omitted" in args["content"]
-    assert "foo.ts" in args["content"]
-    assert len(args["content"]) < len(file_content)
+    # The payload key is removed, not replaced by a stub: a model that imitates this past call sends a
+    # write without content, which the tool refuses, instead of writing a stub over the file.
+    assert "content" not in args and args["path"] == "foo.ts"
+    assert "foo.ts" in args["cmi_omitted"] and "cmi:" in args["cmi_omitted"]
+    assert len(json.dumps(args)) < len(file_content)
     # tool_call id/name untouched — pairing intact
     assert tc["id"] == "wc1"
     assert tc["function"]["name"] == "write_file"

@@ -59,6 +59,9 @@ _CONTENT_ARG_KEYS = ("content", "new_string", "file_content", "text")
 # Further payload keys, also shortened (Edit's old_string, editor tools, patch envelopes, MultiEdit).
 _MORE_ARG_KEYS = ("old_string", "file_text", "new_str", "old_str", "new_source", "diff", "patch", "input",
                   "edits")
+# The note that replaces the removed payload keys of a shortened past write (see
+# render_tool_call_args_digest).
+OMITTED_ARG_KEY = "cmi_omitted"
 TOOL_ARGS_RECENT_AGE: int = 2       # same recency window as results
 TOOL_ARGS_MIN_CHARS: int = 300      # profitability floor for the payload itself
 
@@ -413,10 +416,14 @@ class ToolResultLifecycle:
     def render_tool_call_args_digest(
         self, instance_id: str, *, tool_name: str, args: Dict[str, Any], stash=None,
     ) -> Dict[str, Any]:
-        """Return a NEW args dict with the content payload replaced by a
-        compact, memoized reference (path + size) — never the tool_call
-        structure itself. The written file is the durable source of truth
-        on disk; this only removes the duplicate copy from context.
+        """Return a NEW args dict without the payload keys, plus one ``cmi_omitted`` note (keys,
+        sizes, path, recall keys) — never the tool_call structure itself. The written file is the
+        durable source of truth on disk; this only removes the duplicate copy from context.
+
+        The payload key is REMOVED rather than replaced by a stub: a model that imitates a past
+        call it sees in its context then sends a write without its payload, which the tool refuses
+        ("missing content"), instead of writing a stub over the file (seen live with the old
+        ``[CMI: content omitted ...]`` stub, copied with an invented recall key into a new file).
         """
         cache_key = _ck(f"args:{instance_id}", json.dumps(args, sort_keys=True, default=str))
         cached = self._digest_cache.get(cache_key)
@@ -429,10 +436,11 @@ class ToolResultLifecycle:
         path = str(next((args[k] for k in ("path", "file_path", "file", "filename", "target_file")
                          if isinstance(args.get(k), str) and args[k]), "(unknown path)"))
         main_done = False
+        removed: List[str] = []
         for key in _CONTENT_ARG_KEYS + _MORE_ARG_KEYS:
             v = out.get(key)
             if key in _CONTENT_ARG_KEYS and main_done:
-                continue  # one primary payload, as before (byte-stable stubs for existing sessions)
+                continue  # one primary payload per call
             if key == "edits" and isinstance(v, list) and v:
                 v = json.dumps(v, ensure_ascii=False)
             if not (isinstance(v, str) and v) or len(v) < 80:
@@ -440,14 +448,12 @@ class ToolResultLifecycle:
             ref = stash(v) if stash else ""
             if ref is None:  # could not keep the original: leave the payload untouched
                 return dict(args)
-            if key in _CONTENT_ARG_KEYS:
-                out[key] = (
-                    f"[CMI: content omitted — already written to {path}, "
-                    f"{len(v):,} chars. File on disk is the source of truth.]{ref}"
-                )
-                main_done = True
-            else:
-                out[key] = f"[CMI: {key} omitted — {len(v):,} chars, applied to {path}.]{ref}"
+            del out[key]
+            removed.append(f"{key} ({len(v):,} chars){ref}")
+            main_done = main_done or key in _CONTENT_ARG_KEYS
+        if removed:
+            out[OMITTED_ARG_KEY] = (f"CMI removed {', '.join(removed)} from this past call, already applied "
+                                    f"to {path}. A new call must carry its full payload.")
         self._digest_cache[cache_key] = json.dumps(out, ensure_ascii=False)
         return out
 

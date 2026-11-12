@@ -256,9 +256,11 @@ def test_w9_claude_code_old_edit_write_payloads_shortened_and_recallable(tmp_pat
     e.update_model(model="m", context_length=200_000)
     out = e.select_context(msgs)
     calls = {b["id"]: b["input"] for b in out[1]["content"]}
-    assert calls["w1"]["file_path"] == "/r/x.ts" and calls["w1"]["content"].startswith("[CMI")
-    assert calls["e1"]["old_string"].startswith("[CMI: old_string omitted") and calls["e1"]["new_string"].startswith("[CMI")
-    assert isinstance(calls["m1"]["edits"], str) and "cmi:" in calls["m1"]["edits"]
+    assert calls["w1"]["file_path"] == "/r/x.ts" and "content" not in calls["w1"]
+    assert "old_string" not in calls["e1"] and "new_string" not in calls["e1"]
+    assert "edits" not in calls["m1"]
+    for c in calls.values():
+        assert c["cmi_omitted"].startswith("CMI removed ") and "cmi:" in c["cmi_omitted"]
     originals = {e.store.get(k) for k in KEY_RE.findall(json.dumps(out[1]))}
     assert {body, old, new_s, json.dumps([{"old_string": old, "new_string": new_s}])} <= originals
 
@@ -367,3 +369,30 @@ def test_w14_pdf_pages_packed_in_object_streams_are_counted():
     # A corrupt object stream never raises: the visible pages are still counted.
     bad = pdf.replace(packed, b"\x00not zlib" + packed[9:])
     assert document_tokens(doc(bad)) == 1 * 2000
+
+
+def test_w15_pdf_object_stream_sliced_by_its_length_not_by_an_endstream_search():
+    """A stream's bytes can contain the text "endstream" (here: a stored, uncompressed Flate block
+    holding a page title). The stream is sliced by its direct /Length, and the /First of a previous
+    object stream is never borrowed (pre-release review 2026-11-12)."""
+    import base64
+    import zlib
+    from cmi.compat import _pdf_pages
+
+    def objstm(obj_no, nums, title=b""):
+        objs = [b"<< /Type /Page /Parent 2 0 R /T (" + title + b") >>\n" for _ in nums]
+        offs, pos = [], 0
+        for o in objs:
+            offs.append(pos)
+            pos += len(o)
+        head = b" ".join(b"%d %d" % (n, o) for n, o in zip(nums, offs)) + b"\n"
+        packed = zlib.compress(head + b"".join(objs), 0)  # level 0: the payload is stored as is
+        return (b"%d 0 obj << /Length %d /First %d /Type /ObjStm /N %d /Filter /FlateDecode >>\nstream\n"
+                % (obj_no, len(packed), len(head), len(nums)) + packed + b"\nendstream\nendobj\n")
+
+    pdf = (b"%PDF-1.5\n" + objstm(7, range(10, 20)) + objstm(8, range(20, 45), title=b"the endstream keyword"))
+    assert b"endstream keyword" in pdf
+    assert _pdf_pages(pdf) == 35
+    doc = {"type": "document", "source": {"type": "base64", "data": base64.b64encode(pdf).decode()}}
+    from cmi.compat import document_tokens
+    assert document_tokens(doc) == 35 * 2000
