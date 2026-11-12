@@ -154,7 +154,7 @@ class RecallStore:
                     self._write(path, data)
                     self._since_prune += len(data)
                     break
-                if self._same(path, data):
+                if self._same_settled(path, data):
                     os.utime(path)  # keep live originals out of the retention window
                     break
             else:
@@ -171,6 +171,19 @@ class RecallStore:
     def _same(path: Path, data: bytes) -> bool:
         return (not path.is_symlink() and path.stat().st_size == len(data)
                 and path.read_bytes() == data)
+
+    @classmethod
+    def _same_settled(cls, path: Path, data: bytes) -> bool:
+        """``_same``, retried while Windows reports the file busy: another writer is replacing it
+        with the same bytes right now (content-addressed). Elsewhere it is ``_same``."""
+        for attempt in range(10):
+            try:
+                return cls._same(path, data)
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
+        return False
 
     def _write(self, path: Path, data: bytes) -> None:
         # Unique per writer: sessions in one process (threads) and several processes may store

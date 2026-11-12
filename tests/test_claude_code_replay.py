@@ -4,7 +4,9 @@ for both streams. Without it the bench never sees the free re-compile CMI gets a
 import datetime
 import json
 
-from bench import claude_code_replay as bench
+import pytest
+
+bench = pytest.importorskip("bench.claude_code_replay", reason="bench/ is not shipped in the sdist")
 
 T0 = datetime.datetime(2026, 11, 1, 9, 0, tzinfo=datetime.timezone.utc)
 
