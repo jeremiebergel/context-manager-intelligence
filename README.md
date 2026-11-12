@@ -34,6 +34,8 @@ original back, exactly as it was. Nothing is thrown away.
 - **About 30% less sent to the AI on average**, up to 43% on a single session. On long sessions measured
   live, almost half (49%) less.
 - **The same plan goes about 1.4× further.** You hit your usage limit later.
+- **It starts after 30 requests.** A short chat is left as it is; from 30 requests on, CMI folds old
+  content, and from 100 requests on about 30% less is sent.
 - **If you pay per use, a lower bill:** about 25% less on average across the 26 sessions we measured.
 - **It remembers your project** *(experimental, in Hermes Agent for now)*: decisions taken in one
   conversation can be found again in a later one, even after switching from Claude to ChatGPT. If a
@@ -95,7 +97,7 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 <td align="center"><b>−25%</b><br>API cost on sessions<br>of 100+ requests</td>
 <td align="center"><b>49%</b><br>fewer tokens sent<br><sub>live, 195-request sessions</sub></td></tr>
 </table>
-<p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.12.0, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
+<p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.12.2, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
 
 <p align="center"><img alt="cmi-proxy status and the offline demo" src="docs/demo.gif" width="760"></p>
 
@@ -105,7 +107,7 @@ On Claude Pro/Max and ChatGPT/Codex plans you do not pay per token, you run into
 cuts what each request carries, so the same limit covers more work and the context window fills up later:
 
 - **30% fewer tokens sent on average, up to 43% on a single session** — the same token budget goes about **1.4× further** (up to 1.7×).
-- On sessions of 100+ requests: **30% fewer tokens on average**, 43% at best.
+- Savings start after 30 requests: 12% fewer tokens between 30 and 99 requests, **30% from 100 requests on** (43% at best).
 - **Live, on long sessions: 49% fewer tokens sent** (6 Hermes sessions of about 195 requests each on Claude Sonnet 5.5, 188M tokens: 48% to 55% per session).
 
 ## API: a lower bill
@@ -116,14 +118,14 @@ waits 30 requests before rewriting a warm cache.
 
 - **−25% modelled cost on average, up to −36%** on the best session.
 - **−25% on average on sessions of 100+ requests**; **−27%** on the 6 live long sessions.
-- **18 of 26 sessions are cheaper.** Before 30 requests a session is only shortened when the provider cache has already expired, because rewriting it is then free.
+- **Savings start at 30 requests:** −11% modelled cost between 30 and 99 requests, −28% between 100 and 299, −25% from 300 on. Before 30 requests a session is only shortened when the provider cache has already expired, because rewriting it is then free.
 - **Claude Code: none of 35 replayed sessions costs more** than without CMI.
 
 <p align="center"><img alt="Tokens sent with and without CMI" src="docs/tokens-with-without.svg" width="760"></p>
 
-<p align="center"><img alt="API cost with CMI vs without, per real session" src="docs/cost-per-session.svg" width="760"></p>
+<p align="center"><img alt="Savings start after 30 requests" src="docs/savings-by-length.svg" width="760"></p>
 
-<p align="center"><img alt="The longer the session, the more CMI saves" src="docs/cost-vs-length.svg" width="760"></p>
+<p align="center"><img alt="API cost with CMI vs without, sessions of 100+ requests" src="docs/cost-per-session.svg" width="760"></p>
 
 ## Install in two minutes (macOS, Linux; Windows in preview)
 
@@ -161,6 +163,7 @@ installs the latest one from this repository. Same engine as the proxy, plus pro
 | Tokens sent | **−30%** (median −26%) | **−43%** |
 | Same subscription budget goes | **1.4×** further | 1.7× |
 | Modelled API cost, all sessions | **−25%** (median −22%) | **−36%** |
+| Sessions of 30–99 requests (10): tokens / modelled API cost | **−12%** / **−11%** | −42% / −36% |
 | Sessions of 100+ requests (15): tokens | **−30%** | −43% |
 | Sessions of 100+ requests (15): modelled API cost | **−25%** | −34% |
 | Claude Code, 35 sessions (proxy replay): sessions costing more than without CMI | **0 of 35** | |
@@ -170,7 +173,7 @@ installs the latest one from this repository. Same engine as the proxy, plus pro
 | Overhead | about 20 ms per request | |
 
 **Method.** Real coding sessions with Claude Opus/Sonnet and GPT-6 models across several projects,
-replayed request by request through CMI 1.12.0, with the provider's 5-minute cache expiry taken into
+replayed request by request through CMI 1.12.2, with the provider's 5-minute cache expiry taken into
 account (`bench/cost_replay.py`; the proxy path is replayed by `bench/claude_code_replay.py`).
 "Modelled cost" is CMI's own accounting of the provider's cache pricing, not a bill, and providers do
 not publish how a token counts against a plan: we report tokens sent, not a number of messages. These
@@ -189,7 +192,7 @@ macOS, a systemd user unit on Linux (install, restart after a crash and uninstal
 logon Scheduled Task on Windows (install round trip run in Windows CI as an administrator; the no-admin case is not verified yet); see
 [docs/REFERENCE.md](docs/REFERENCE.md#install). Windows is covered by the test suite in CI on every push
 (project memory included; file privacy relies on the NTFS permissions of your user profile instead of POSIX
-modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.12.0**; the context engine and proxy are the supported scope.
+modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.12.2**; the context engine and proxy are the supported scope.
 
 ## Project memory across sessions and models *(experimental, on by default in Hermes)*
 
