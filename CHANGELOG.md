@@ -37,6 +37,8 @@ Unreleased work is listed first. Dates are YYYY-MM-DD.
   at hand instead of serializing both bodies again.
 - `install-service`: the backups of editor/agent settings it replaces and the log directory are owner-only
   (0700 directories, 0600 files); settings files may hold keys.
+- Store (Windows): when several writers store the same content at once, the same-content check retries while
+  Windows reports the file busy, instead of giving up on shortening that result.
 - `bench/public_demo.py` runs with the shipped settings (it used to switch the start-up phase off) and has two
   2-hour pauses, longer than the provider cache lifetime: 28% not sent, 7/7 stubs recalled exactly. Its old
   3% came only from the forced-refresh defect fixed above.
