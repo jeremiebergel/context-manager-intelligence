@@ -125,7 +125,7 @@ waits 30 requests before rewriting a warm cache.
 
 <p align="center"><img alt="Savings start after 30 requests" src="docs/savings-by-length.svg" width="760"></p>
 
-<p align="center"><img alt="API cost with CMI vs without, sessions of 100+ requests" src="docs/cost-per-session.svg" width="760"></p>
+<p align="center"><img alt="Tokens sent with CMI vs without, one bar per real session" src="docs/tokens-per-session.svg" width="760"></p>
 
 ## Install in two minutes (macOS, Linux; Windows in preview)
 

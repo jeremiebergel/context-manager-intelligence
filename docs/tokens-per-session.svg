@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="698" viewBox="0 0 760 698" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="760" height="698" rx="12" fill="#0d1117"/>
+<text x="24" y="32" fill="#f0f6fc" font-size="18" font-weight="700">Tokens sent with CMI vs without, one bar per real session</text>
+<text x="24" y="52" fill="#8b949e" font-size="12">Largest session first. Green = fewer tokens with CMI, grey = left as is.</text>
+<line x1="470" y1="64" x2="470" y2="658" stroke="#30363d" stroke-width="1.5"/>
+<text x="24" y="84" fill="#c9d1d9" font-size="12">186.1M tokens · 646 requests</text>
+<rect x="308.4" y="72" width="161.6" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="84" fill="#3fb950" font-size="12" font-weight="700">−27%</text>
+<text x="24" y="106" fill="#c9d1d9" font-size="12">155.5M tokens · 513 requests</text>
+<rect x="265.4" y="94" width="204.6" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="106" fill="#3fb950" font-size="12" font-weight="700">−34%</text>
+<text x="24" y="128" fill="#c9d1d9" font-size="12">144.5M tokens · 353 requests</text>
+<rect x="341.8" y="116" width="128.2" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="128" fill="#3fb950" font-size="12" font-weight="700">−21%</text>
+<text x="24" y="150" fill="#c9d1d9" font-size="12">140.1M tokens · 486 requests</text>
+<rect x="259.4" y="138" width="210.6" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="150" fill="#3fb950" font-size="12" font-weight="700">−35%</text>
+<text x="24" y="172" fill="#c9d1d9" font-size="12"> 52.4M tokens · 340 requests</text>
+<rect x="266.9" y="160" width="203.1" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="172" fill="#3fb950" font-size="12" font-weight="700">−34%</text>
+<text x="24" y="194" fill="#c9d1d9" font-size="12"> 36.0M tokens · 285 requests</text>
+<rect x="272.7" y="182" width="197.3" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="194" fill="#3fb950" font-size="12" font-weight="700">−33%</text>
+<text x="24" y="216" fill="#c9d1d9" font-size="12"> 29.3M tokens · 220 requests</text>
+<rect x="239.6" y="204" width="230.4" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="216" fill="#3fb950" font-size="12" font-weight="700">−38%</text>
+<text x="24" y="238" fill="#c9d1d9" font-size="12"> 25.4M tokens · 204 requests</text>
+<rect x="240.4" y="226" width="229.6" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="238" fill="#3fb950" font-size="12" font-weight="700">−38%</text>
+<text x="24" y="260" fill="#c9d1d9" font-size="12"> 15.6M tokens · 137 requests</text>
+<rect x="213.4" y="248" width="256.6" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="260" fill="#3fb950" font-size="12" font-weight="700">−43%</text>
+<text x="24" y="282" fill="#c9d1d9" font-size="12"> 14.3M tokens · 168 requests</text>
+<rect x="326.1" y="270" width="143.9" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="282" fill="#3fb950" font-size="12" font-weight="700">−24%</text>
+<text x="24" y="304" fill="#c9d1d9" font-size="12"> 13.4M tokens · 119 requests</text>
+<rect x="258.9" y="292" width="211.1" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="304" fill="#3fb950" font-size="12" font-weight="700">−35%</text>
+<text x="24" y="326" fill="#c9d1d9" font-size="12"> 11.2M tokens · 144 requests</text>
+<rect x="301.2" y="314" width="168.8" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="326" fill="#3fb950" font-size="12" font-weight="700">−28%</text>
+<text x="24" y="348" fill="#c9d1d9" font-size="12"> 10.8M tokens · 152 requests</text>
+<rect x="339.8" y="336" width="130.2" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="348" fill="#3fb950" font-size="12" font-weight="700">−22%</text>
+<text x="24" y="370" fill="#c9d1d9" font-size="12">  9.7M tokens · 121 requests</text>
+<rect x="317.3" y="358" width="152.7" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="370" fill="#3fb950" font-size="12" font-weight="700">−25%</text>
+<text x="24" y="392" fill="#c9d1d9" font-size="12">  6.8M tokens · 50 requests</text>
+<rect x="456.6" y="380" width="13.4" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="392" fill="#3fb950" font-size="12" font-weight="700">−2%</text>
+<text x="24" y="414" fill="#c9d1d9" font-size="12">  5.5M tokens · 108 requests</text>
+<rect x="369.5" y="402" width="100.5" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="414" fill="#3fb950" font-size="12" font-weight="700">−17%</text>
+<text x="24" y="436" fill="#c9d1d9" font-size="12">  4.5M tokens · 96 requests</text>
+<rect x="310.3" y="424" width="159.7" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="436" fill="#3fb950" font-size="12" font-weight="700">−27%</text>
+<text x="24" y="458" fill="#c9d1d9" font-size="12">  3.2M tokens · 57 requests</text>
+<rect x="356.6" y="446" width="113.4" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="458" fill="#3fb950" font-size="12" font-weight="700">−19%</text>
+<text x="24" y="480" fill="#c9d1d9" font-size="12">  2.8M tokens · 63 requests</text>
+<text x="478" y="480" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="502" fill="#c9d1d9" font-size="12">  2.5M tokens · 33 requests</text>
+<text x="478" y="502" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="524" fill="#c9d1d9" font-size="12">  2.4M tokens · 54 requests</text>
+<rect x="267.5" y="512" width="202.5" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="524" fill="#3fb950" font-size="12" font-weight="700">−34%</text>
+<text x="24" y="546" fill="#c9d1d9" font-size="12">  1.8M tokens · 39 requests</text>
+<text x="478" y="546" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="568" fill="#c9d1d9" font-size="12">  1.8M tokens · 28 requests</text>
+<text x="478" y="568" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="590" fill="#c9d1d9" font-size="12">  1.1M tokens · 43 requests</text>
+<rect x="216.1" y="578" width="253.9" height="14" rx="3" fill="#3fb950"/>
+<text x="478" y="590" fill="#3fb950" font-size="12" font-weight="700">−42%</text>
+<text x="24" y="612" fill="#c9d1d9" font-size="12">  0.9M tokens · 41 requests</text>
+<text x="478" y="612" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="634" fill="#c9d1d9" font-size="12">  0.7M tokens · 35 requests</text>
+<text x="478" y="634" fill="#8b949e" font-size="12" font-weight="700">0%</text>
+<text x="24" y="668" fill="#8b949e" font-size="11.5">26 real coding sessions (Claude and GPT models), offline replay of CMI 1.12.2.</text>
+<text x="24" y="686" fill="#8b949e" font-size="11.5">Weighted by tokens: 30% fewer tokens on average, 30% on sessions of 100+ requests.</text></svg>
