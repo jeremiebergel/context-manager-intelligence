@@ -4,6 +4,7 @@
 Free, open source, and it runs on your own computer.</p>
 
 <p align="center">
+<a href="https://github.com/NousResearch/hermes-agent/blob/main/plugin-catalog/cmi.yaml"><img alt="Hermes plugin catalog: cmi" src="https://img.shields.io/badge/Hermes%20plugin%20catalog-cmi-8A2BE2"></a>
 <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-blue">
 <img alt="python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue">
 <img alt="LLM calls: 0" src="https://img.shields.io/badge/LLM%20calls-0-brightgreen">
@@ -12,7 +13,7 @@ Free, open source, and it runs on your own computer.</p>
 <a href="https://github.com/jeremiebergel/context-manager-intelligence/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/jeremiebergel/context-manager-intelligence?label=discussions"></a>
 </p>
 
-<p align="center"><b>Accepted in the official Hermes plugin catalog</b> · in Hermes: <code>hermes plugins install cmi</code></p>
+<h3 align="center">In the official Hermes Agent plugin catalog: <code>hermes plugins install cmi</code></h3>
 
 <p align="center"><a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-v2-16x9.mp4"><img alt="CMI in under a minute" src="docs/demo-video.gif" width="100%"></a><br><sub>Under a minute, plays automatically · <a href="https://github.com/jeremiebergel/context-manager-intelligence/releases/download/v1.11.2/cmi-demo-v2-16x9.mp4">MP4 version</a></sub></p>
 
@@ -30,18 +31,17 @@ original back, exactly as it was. Nothing is thrown away.
 
 ## What you get
 
-- **About 28% less sent to the AI on average**, up to 42% on a single session. On long sessions measured
+- **About 30% less sent to the AI on average**, up to 43% on a single session. On long sessions measured
   live, almost half (49%) less.
 - **The same plan goes about 1.4× further.** You hit your usage limit later.
-- **If you pay per use, a lower bill:** about 24% less on average, and none of the 26 sessions we measured
-  cost more than without CMI.
+- **If you pay per use, a lower bill:** about 25% less on average across the 26 sessions we measured.
 - **It remembers your project** *(experimental, in Hermes Agent for now)*: decisions taken in one
   conversation can be found again in a later one, even after switching from Claude to ChatGPT. If a
   decision changes, the new version replaces the old one.
 
-<sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 9 Claude
-Code sessions replayed the same way: 20% less sent. Your sessions will differ: you can measure your own
-(see below).</sub>
+<sub>Measured on 26 real work sessions of the author in Hermes Agent, with Claude and GPT models. On 35 Claude
+Code sessions replayed the same way, none costs more than without CMI, and those of 100+ requests send 26%
+less on average. Your sessions will differ: you can measure your own (see below).</sub>
 
 ## Doesn't Claude already do this?
 
@@ -76,6 +76,8 @@ cmi-proxy install-service
 
 Then keep working as usual. `cmi-proxy uninstall-service` removes everything and puts your settings back.
 
+**Hermes Agent:** CMI is in the official Hermes plugin catalog, one command: `hermes plugins install cmi`.
+
 ---
 
 # Technical details
@@ -87,13 +89,13 @@ for every client, and troubleshooting.
 Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every shortened result comes back byte-exact.</p>
 
 <table align="center">
-<tr><td align="center"><b>28%</b><br>fewer tokens sent<br><sub>on average, up to 42%</sub></td>
+<tr><td align="center"><b>30%</b><br>fewer tokens sent<br><sub>on average, up to 43%</sub></td>
 <td align="center"><b>1.4×</b><br>further on the same<br>subscription budget</td>
-<td align="center"><b>−24%</b><br>API cost on average<br><sub>up to −36%</sub></td>
+<td align="center"><b>−25%</b><br>API cost on average<br><sub>up to −36%</sub></td>
 <td align="center"><b>−25%</b><br>API cost on sessions<br>of 100+ requests</td>
 <td align="center"><b>49%</b><br>fewer tokens sent<br><sub>live, 195-request sessions</sub></td></tr>
 </table>
-<p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.11.1, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
+<p align="center"><sub>26 real coding sessions with Claude and GPT models, replayed request by request through CMI 1.12.0, weighted by tokens; plus 6 live Hermes sessions on Claude Sonnet 5.5. Method below.</sub></p>
 
 <p align="center"><img alt="cmi-proxy status and the offline demo" src="docs/demo.gif" width="760"></p>
 
@@ -102,19 +104,20 @@ Local, deterministic, zero-LLM, about 20 ms per request. Nothing is lost: every 
 On Claude Pro/Max and ChatGPT/Codex plans you do not pay per token, you run into a usage limit. CMI
 cuts what each request carries, so the same limit covers more work and the context window fills up later:
 
-- **28% fewer tokens sent on average, up to 42% on a single session** — the same token budget goes about **1.4× further** (up to 1.7×).
-- On sessions of 100+ requests: **29% fewer tokens on average**, 38% at best.
+- **30% fewer tokens sent on average, up to 43% on a single session** — the same token budget goes about **1.4× further** (up to 1.7×).
+- On sessions of 100+ requests: **30% fewer tokens on average**, 43% at best.
 - **Live, on long sessions: 49% fewer tokens sent** (6 Hermes sessions of about 195 requests each on Claude Sonnet 5.5, 188M tokens: 48% to 55% per session).
 
 ## API: a lower bill
 
 With prompt caching, shortening old content only pays if the cache rewrite is repaid by later requests.
 CMI prices every rewrite against the provider's cache rules and acts only when it pays back, and it
-waits 100 requests before rewriting a warm cache.
+waits 30 requests before rewriting a warm cache.
 
-- **−24% modelled cost on average, up to −36%** on the best session.
-- **−25% on average on sessions of 100+ requests**, every one of them cheaper; **−27%** on the 6 live long sessions.
-- **No session costs more**: 17 of 26 are cheaper, the other 9 (all short) are left untouched at 0%. A short session is only shortened when the provider cache has already expired, because rewriting it is then free.
+- **−25% modelled cost on average, up to −36%** on the best session.
+- **−25% on average on sessions of 100+ requests**; **−27%** on the 6 live long sessions.
+- **18 of 26 sessions are cheaper.** Before 30 requests a session is only shortened when the provider cache has already expired, because rewriting it is then free.
+- **Claude Code: none of 35 replayed sessions costs more** than without CMI.
 
 <p align="center"><img alt="Tokens sent with and without CMI" src="docs/tokens-with-without.svg" width="760"></p>
 
@@ -137,8 +140,11 @@ on `127.0.0.1` only, uses about 13 MB and 0% CPU when idle.
 **Any other agent** (Cline, Aider, OpenCode, Claude Code or Codex in a terminal, your own scripts): start
 `cmi-proxy --port 8787` and point the client's base URL at `http://127.0.0.1:8787`
 (`ANTHROPIC_BASE_URL` for Anthropic clients; a provider entry for Codex). See
-[docs/REFERENCE.md](docs/REFERENCE.md#install). **Hermes Agent** also has a native plugin with the same
-engine: `hermes plugins install jeremiebergel/context-manager-intelligence/cmi`.
+[docs/REFERENCE.md](docs/REFERENCE.md#install).
+
+**Hermes Agent:** CMI is in the official Hermes plugin catalog: `hermes plugins install cmi` installs the
+version the catalog has reviewed; `hermes plugins install jeremiebergel/context-manager-intelligence/cmi`
+installs the latest one from this repository. Same engine as the proxy, plus project memory.
 
 ## What it does for you
 
@@ -150,21 +156,21 @@ engine: `hermes plugins install jeremiebergel/context-manager-intelligence/cmi`.
 
 ## Measured results
 
-| Measure (26 real sessions, 636M tokens) | Average | Best |
+| Measure (26 real sessions, 878M tokens) | Average | Best |
 |---|---:|---:|
-| Tokens sent | **−28%** (median −22%) | **−42%** |
+| Tokens sent | **−30%** (median −26%) | **−43%** |
 | Same subscription budget goes | **1.4×** further | 1.7× |
-| Modelled API cost, all sessions | **−24%** (median −21%) | **−36%** |
-| Sessions of 100+ requests (15): tokens | **−29%** | −38% |
+| Modelled API cost, all sessions | **−25%** (median −22%) | **−36%** |
+| Sessions of 100+ requests (15): tokens | **−30%** | −43% |
 | Sessions of 100+ requests (15): modelled API cost | **−25%** | −34% |
-| Sessions costing more than without CMI | **0 of 26** | |
+| Claude Code, 35 sessions (proxy replay): sessions costing more than without CMI | **0 of 35** | |
 | Live: 6 Hermes sessions of ~195 requests (Sonnet 5.5): tokens | **−49%** | −55% |
 | Live: same sessions, modelled API cost | **−27%** | −32% |
 | Integrity | every shortened result recalled byte-exact, 0 invariant violations | |
 | Overhead | about 20 ms per request | |
 
 **Method.** Real coding sessions with Claude Opus/Sonnet and GPT-6 models across several projects,
-replayed request by request through CMI 1.11.1, with the provider's 5-minute cache expiry taken into
+replayed request by request through CMI 1.12.0, with the provider's 5-minute cache expiry taken into
 account (`bench/cost_replay.py`; the proxy path is replayed by `bench/claude_code_replay.py`).
 "Modelled cost" is CMI's own accounting of the provider's cache pricing, not a bill, and providers do
 not publish how a token counts against a plan: we report tokens sent, not a number of messages. These
@@ -183,7 +189,7 @@ macOS, a systemd user unit on Linux (install, restart after a crash and uninstal
 logon Scheduled Task on Windows (install round trip run in Windows CI as an administrator; the no-admin case is not verified yet); see
 [docs/REFERENCE.md](docs/REFERENCE.md#install). Windows is covered by the test suite in CI on every push
 (project memory included; file privacy relies on the NTFS permissions of your user profile instead of POSIX
-modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.11.3**; the context engine and proxy are the supported scope.
+modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.12.0**; the context engine and proxy are the supported scope.
 
 ## Project memory across sessions and models *(experimental, on by default in Hermes)*
 
@@ -213,7 +219,7 @@ anywhere and no model is called.
   `cmi-proxy uninstall-service` removes the setting.
 - **`status` says "not pointed":** reload VS Code (`Developer: Reload Window`) and open a new conversation;
   a conversation started before the install keeps its old settings.
-- **No savings on a short session:** expected. CMI does not rewrite a warm cache before 100 requests.
+- **No savings on a short session:** expected. CMI does not rewrite a warm cache before 30 requests.
 - **Something odd?** Open an issue with the output of `cmi-proxy status`.
 
 ## Safety

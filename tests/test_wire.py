@@ -69,6 +69,10 @@ def test_w3_session_key_ignores_moving_cache_breakpoints():
     m2[0] = {"role": "user", "content": [{"type": "text", "text": "start", "cache_control": {"type": "ephemeral"}}]}
     m1[0] = {"role": "user", "content": [{"type": "text", "text": "start"}]}
     assert proxy.Sessions.key("/v1/messages", body, m1) == proxy.Sessions.key("/v1/messages", body, m2)
+    # One pass gives both keys (the first user message is serialized once per request).
+    for m in (m1, m1[:1]):
+        assert proxy.Sessions.keys("/v1/messages", body, m) == (
+            proxy.Sessions.key("/v1/messages", body, m), proxy.Sessions.pending_key("/v1/messages", body, m))
 
 
 def test_w3b_same_first_prompt_new_conversation_gets_its_own_engine(tmp_path):
@@ -304,3 +308,62 @@ def test_w12_nested_images_estimated_at_billed_size_not_base64():
             "content": [{"type": "input_image", "image_url": "data:image/png;base64," + "A" * 400_000}]}
     for m in (anth, resp):
         assert 1_000 <= est([m]) < 2_000  # host-calibrated or flat 1,600, est([m])
+
+
+def test_w13_base64_pdf_estimated_per_page_not_base64():
+    """Replay of real Claude Code sessions 2026-11-11: a PDF attached to the conversation rides as
+    a base64 `document` block. Counted as text, a 4 MB PDF weighed ~1M tokens (real: ~2K a page)."""
+    import base64
+    from cmi.compat import document_tokens, estimate_messages_tokens_rough as est
+    pdf = b"%PDF-1.7\n" + b"".join(b"%d 0 obj << /Type /Page /Parent 1 0 R >> endobj\n" % i for i in range(30))
+    pdf += b"1 0 obj << /Type /Pages /Count 30 >> endobj\n" + b"\0" * 3_000_000
+    doc = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                          "data": base64.b64encode(pdf).decode()}}
+    assert document_tokens(doc) == 30 * 2000          # /Type /Pages is not a page
+    top = {"role": "user", "content": [{"type": "text", "text": "read this"}, doc]}
+    nested = {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": [doc]}]}
+    for m in (top, nested):
+        assert 60_000 <= est([m]) < 61_000, est([m])
+    # Page objects hidden in compressed streams: sized from the file, never from the base64 text.
+    opaque = {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                             "data": base64.b64encode(b"\1" * 1_000_000).decode()}}
+    assert document_tokens(opaque) == 10 * 2000
+    # Only base64 documents are re-priced; a plain-text document stays counted as text.
+    text_doc = {"type": "document", "source": {"type": "text", "media_type": "text/plain", "data": "x" * 4000}}
+    assert document_tokens(text_doc) is None and document_tokens({"type": "text", "text": "x"}) is None
+    assert est([{"role": "user", "content": [text_doc]}]) >= 900
+
+
+def test_w14_pdf_pages_packed_in_object_streams_are_counted():
+    """PDF 1.5+ writers (browsers, office suites) pack page objects in compressed object streams:
+    the page dictionaries are not visible in the raw bytes. Counting only the visible ones priced a
+    40-page PDF as one page (pre-release review 2026-11-11)."""
+    import base64
+    import zlib
+    from cmi.compat import document_tokens
+    def doc(pdf):
+        return {"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                               "data": base64.b64encode(pdf).decode()}}
+
+    def objstm(nums):  # object stream: "num offset" pairs, then the page dictionaries
+        objs = [b"<< /Type /Page /Parent 2 0 R >>\n" for _ in nums]
+        offs, pos = [], 0
+        for o in objs:
+            offs.append(pos)
+            pos += len(o)
+        head = b" ".join(b"%d %d" % (n, o) for n, o in zip(nums, offs)) + b"\n"
+        packed = zlib.compress(head + b"".join(objs))
+        return (b"9 0 obj << /Type /ObjStm /N " + str(len(nums)).encode() + b" /First "
+                + str(len(head)).encode() + b" /Filter /FlateDecode /Length " + str(len(packed)).encode()
+                + b" >>\nstream\n" + packed + b"\nendstream\nendobj\n"), packed
+
+    stream, packed = objstm(range(10, 50))
+    pdf = (b"%PDF-1.5\n2 0 obj << /Type /Pages /Count 41 >> endobj\n"
+           b"3 0 obj << /Type /Page /Parent 2 0 R >> endobj\n" + stream)  # one page left outside
+    assert document_tokens(doc(pdf)) == 41 * 2000
+    # An incremental update rewrites pages 10-24 as plain objects (arXiv stamps, signatures): counted once.
+    update = b"".join(b"%d 0 obj << /Type /Page /Parent 2 0 R /Annots [] >> endobj\n" % n for n in range(10, 25))
+    assert document_tokens(doc(pdf + update)) == 41 * 2000
+    # A corrupt object stream never raises: the visible pages are still counted.
+    bad = pdf.replace(packed, b"\x00not zlib" + packed[9:])
+    assert document_tokens(doc(bad)) == 1 * 2000

@@ -5,10 +5,11 @@ shell; which paths a shell command writes; stable command keys and labels. No en
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from .compat import _summarize_tool_result
 
@@ -180,6 +181,20 @@ def shell_written_paths(command: str) -> List[str]:
     targets (and mv sources, which disappear), rm, truncate, git checkout/restore -- <files>.
     Deliberately conservative: an unparsable command yields nothing (the read then stays
     current, which is what happened before this existed)."""
+    if not isinstance(command, str):
+        return _parse_shell_written_paths(command)
+    return list(_shell_written_paths_cached(command))
+
+
+@functools.lru_cache(maxsize=4096)
+def _shell_written_paths_cached(command: str) -> Tuple[str, ...]:
+    # Every request re-scans every shell call of the history: parsing each command again was
+    # ~40% of the compile time on a 208-request Claude Code session (profile 2026-11-11). The
+    # result depends on the command text only.
+    return tuple(_parse_shell_written_paths(command))
+
+
+def _parse_shell_written_paths(command: str) -> List[str]:
     import shlex
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=";&|")

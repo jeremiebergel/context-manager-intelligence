@@ -2,6 +2,45 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.0 (2026-11-11)
+
+- Start-up phase 100 -> 30 requests in Hermes, 150 -> 30 through the proxy (Claude Code, Codex). With the
+  forced-refresh defect below fixed, waiting longer only left mid-length sessions untouched.
+  - Hermes, replay of 305 real sessions (Claude Opus/Sonnet 5.5, GPT-6.1, GPT-6; desktop, kanban, subagents):
+    tokens sent -31.2% -> -35.3%, modelled cost -27.1% -> -28.6%, the same in both halves of the set; on GPT-6.1
+    sessions -30.5% -> -42.8% tokens, on kanban runs -23.4% -> -38.9%, on subagents -0.4% -> -9.8%. Confirmed
+    on 81 other sessions: -34.2% -> -35.0% cost, -39.3% -> -40.9% tokens.
+  - Claude Code, replay of 35 real sessions at the 1-hour cache price: modelled cost -12.6% -> -14.8%, tokens
+    -13.4% -> -17.2% (size-weighted); sessions of 107-130 requests go from untouched to -11%..-32%; none costs
+    more than without CMI.
+  - Tune with `CMI_WARMUP_REQUESTS` / `CMI_PROXY_WARMUP_REQUESTS`.
+- Fix: a forced refresh ("the turn needs this result in full") no longer replaces a result that was already
+  sent in full. A later pass (duplicate collapse) could shorten such a result, and the forced refresh sent that
+  stub outside the payback rule: on a real Claude Code session, 195K tokens of cache were re-written to remove
+  59, as soon as the start-up phase ended. Replay of 7 real sessions on their own clock: none worse, one from
+  -10.7% to -14.1% cost, one from -19.1% to -19.9%. The opt-in `CMI_SUPERSEDED_REFRESH` keeps replacing an
+  obsolete read sent in full (its full text is wrong once the file was edited).
+- `bench/claude_code_replay.py` replays each session on its own clock and reads the cache state Claude Code
+  recorded. A pause longer than the cache lifetime, or a request recorded as re-writing its prompt, loses the
+  cache for both streams. Without the clock the bench never saw the re-compile CMI gets for free after a pause
+  and under-stated the result (largest session: -17.6% cost without the clock, -25.7% with it). New output:
+  `cold_idle`, `cold_other`, `by_request_rank`, `replayed_share_of_billed_input`. `CMI_REPLAY_CLOCK=0` gives
+  the old behaviour.
+- Token estimate: a base64 PDF (`document` block) is priced per page (about 2K tokens) instead of by its base64
+  length. A 4 MB PDF weighed about 1M tokens. Pages packed in compressed object streams (PDF 1.5+) are
+  counted, each page once even when an incremental update rewrites it; 19 of 19 real PDFs match their
+  true page count.
+- Shell-command parsing is cached per command text (it was about 40% of the compile time on a 208-request
+  session).
+- Proxy: the session key is computed in one pass (the system prompt and a first message that may carry a large
+  attachment were serialized twice per request), and the request sizes in the log come from the bytes already
+  at hand instead of serializing both bodies again.
+- `install-service`: the backups of editor/agent settings it replaces and the log directory are owner-only
+  (0700 directories, 0600 files); settings files may hold keys.
+- `bench/public_demo.py` runs with the shipped settings (it used to switch the start-up phase off) and has two
+  2-hour pauses, longer than the provider cache lifetime: 28% not sent, 7/7 stubs recalled exactly. Its old
+  3% came only from the forced-refresh defect fixed above.
+
 ## 1.11.5 (2026-11-10)
 
 - Proxy (Claude Code, Codex): waits 150 requests (was 100) before rewriting the cache and uses a stricter payback

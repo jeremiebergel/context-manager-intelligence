@@ -56,6 +56,10 @@ def test_install_status_uninstall_in_temp_home(tmp_path):
     assert plist["Nice"] == 10 and (__import__("os").name == "nt" or (p["plist"].stat().st_mode & 0o777) == 0o600)
     assert any("vscode: added" in x for x in out) and any("codex: added" in x for x in out)
     assert list(p["backups"].iterdir())
+    if __import__("os").name != "nt":
+        # Backups copy editor/agent settings and logs name sessions: owner-only.
+        assert (p["backups"].stat().st_mode & 0o777) == 0o700 and (p["logs"].stat().st_mode & 0o777) == 0o700
+        assert all((f.stat().st_mode & 0o777) == 0o600 for f in p["backups"].iterdir())
     st = service.status(port=1, home=tmp_path, plat="darwin")
     assert any("NOT answering" in x for x in st) and any("WARNING" in x for x in st)
     service.uninstall(home=tmp_path, plat="darwin")

@@ -87,3 +87,52 @@ def test_unrelated_engine_does_not_adopt():
     other = [{"role": "system", "content": "other"}, {"role": "user", "content": "hi"}]
     b.select_context(other)
     assert not b.telemetry.get("adopted_parent")
+
+
+def _forced_refresh(first_rendering, fresh_rendering, superseded=False):
+    """Two requests on a warm cache; message 2 is one the current turn needs in full
+    (``_must_refresh``), or, with ``superseded``, a read made obsolete by a later edit under the
+    opt-in CMI_SUPERSEDED_REFRESH. Returns what the second request sends for it."""
+    e = make_engine()
+    e.warmup_requests = 0
+    full = {"role": "tool", "tool_call_id": "c1", "content": "full result " * 60}
+    stub = {"role": "tool", "tool_call_id": "c1", "content": "[CMI dup] cmi:aaaaaaaaaaaa identical to an earlier result"}
+    pick = {"full": full, "stub": stub}
+    head = [{"role": "user", "content": "q1"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "type": "function",
+             "function": {"name": "terminal", "arguments": "{}"}}]},
+            full, {"role": "assistant", "content": "a1"}]
+    tail = [{"role": "user", "content": "q2"}, {"role": "assistant", "content": "a2"},
+            {"role": "user", "content": "q3"}]
+
+    def send(msgs, rendering, must):
+        e._user_idx = len(msgs) - 1
+        e._must_refresh = must
+        e._superseded_forced = set(must) if superseded else set()
+        compiled = list(msgs)
+        compiled[2] = pick[rendering]
+        out = e._apply_cache_tiers(msgs, compiled, len(msgs) - 1)
+        return (out or msgs)[2]
+
+    send(head + tail[:1], first_rendering, set())
+    return send(head + tail, fresh_rendering, {2}), full, stub
+
+
+def test_forced_refresh_restores_a_shortened_result():
+    sent, full, _ = _forced_refresh("stub", "full")
+    assert sent["content"] == full["content"]
+
+
+def test_forced_refresh_never_shortens_a_result_already_sent_in_full():
+    """Real Claude Code session, 2026-11-11: a result the turn needed in full was already cached
+    in full, a later pass collapsed it as a duplicate, and the forced refresh sent that stub the
+    moment the start-up phase ended: 195K tokens of cache re-written to remove 59."""
+    sent, full, _ = _forced_refresh("full", "stub")
+    assert sent["content"] == full["content"]
+
+
+def test_opt_in_superseded_refresh_still_replaces_a_read_sent_in_full():
+    """CMI_SUPERSEDED_REFRESH=1: an obsolete read sent in full takes its fresh (outdated-marked)
+    rendering at once. The already-sent-in-full exception is for the turn-needs-it-in-full path only."""
+    sent, _, stub = _forced_refresh("full", "stub", superseded=True)
+    assert sent["content"] == stub["content"]

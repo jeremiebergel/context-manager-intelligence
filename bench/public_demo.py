@@ -1,9 +1,10 @@
 """Reproducible public benchmark: a synthetic coding session, no network, no API key, no private data.
 
 The session is generated deterministically (fixed content, no randomness): an agent works on a
-small project over 4 user requests, reading files, grepping, running tests, editing and re-reading.
+small project over 4 user requests, reading files, grepping, running tests, editing and re-reading,
+with a 2-hour pause before requests 3 and 4 (the provider cache is gone by then).
 Every request the agent would send (after each user message and each tool result) goes through the
-proxy compile path, exactly as `cmi-proxy` does it. Reported:
+proxy compile path with the shipped settings, exactly as `cmi-proxy` does it. Reported:
   chars_sent / chars_original   over the whole session (what a token plan pays for, roughly)
   quota_saved, runway_x         share NOT sent and 1 / (1 - saved)
 Checked (the run fails if any is false):
@@ -26,15 +27,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from cmi import engine as _engine  # noqa: E402
 from cmi import proxy  # noqa: E402
 
-# This synthetic session has 30 requests: the start-up phase (100 requests in Hermes, 150 behind the proxy;
-# no cache rewrite on a warm cache) would leave it untouched, so the demo switches it off to show the mechanics.
-_engine.WARMUP_REQUESTS = 0
-proxy.PROXY_WARMUP_REQUESTS = 0
-
+# The demo runs with the shipped settings. On a warm provider cache a 30-request session stays
+# untouched (rewriting the cache would cost more than it saves), so the session has two pauses
+# longer than the cache lifetime, as real sessions do (lunch, next morning): the cache is lost
+# anyway, and CMI re-compiles the history for free at that point.
 ROUTE = "/v1/messages"
+STEP_S = 20.0             # seconds between two requests inside a user request
+PAUSE_S = 2 * 3600.0      # pause before these user requests (1-based)
+PAUSED_REQUESTS = (3, 4)
 
 
 def source(name: str, n: int) -> str:
@@ -110,10 +112,28 @@ def requests():
         msgs.append({"role": "assistant", "content": [{"type": "text", "text": "Done with this request."}]})
 
 
+class _ClockedSessions(proxy.Sessions):
+    """Engines read the demo clock instead of the wall clock (deterministic pauses)."""
+
+    def __init__(self, home: str, clock) -> None:
+        super().__init__(home)
+        self._demo_clock = clock
+
+    def get(self, *args, **kwargs):
+        entry = super().get(*args, **kwargs)
+        entry[0]._clock = self._demo_clock
+        return entry
+
+
 def run(home: str):
-    sessions = proxy.Sessions(home)
+    now = [0.0]
+    sessions = _ClockedSessions(home, lambda: now[0])
     sent, orig, outs = 0, 0, []
+    user_requests = 0
     for body in requests():
+        n = sum(1 for m in body["messages"] if m["role"] == "user" and isinstance(m["content"], str))
+        now[0] += PAUSE_S if n != user_requests and n in PAUSED_REQUESTS else STEP_S
+        user_requests = n
         new, _ = proxy.compile_request(sessions, ROUTE, body)
         orig += len(json.dumps(body, ensure_ascii=False))
         out = json.dumps(new, ensure_ascii=False, sort_keys=True)
@@ -164,7 +184,8 @@ def main() -> int:
     if "--json" in sys.argv:
         print(json.dumps(res, indent=2))
     else:
-        print("(demo: start-up phase disabled, a 30-request session would otherwise stay untouched)")
+        print(f"(demo: shipped settings; {PAUSE_S / 3600:g} h pauses before user requests "
+              f"{', '.join(map(str, PAUSED_REQUESTS))}, longer than the provider cache lifetime)")
         print(f"{res['requests']} requests, {orig:,} -> {sent:,} chars sent: "
               f"{res['quota_saved']:.0%} not sent (runway x{res['runway_x']})")
         print(f"stubs recallable exactly: {res['stubs_recallable']}; pairs intact: {res['pairs_intact']}; "

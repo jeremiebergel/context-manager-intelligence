@@ -10,7 +10,7 @@ On every request, CMI compiles the history:
 | Pass | What happens | Guard |
 |---|---|---|
 | Tool results | Old results for files/commands you have stopped working on become a **digest** (the full path/command, plus head, tail and error lines) | Kept raw if recent, if they concern a file you are working on, or if the digest would not remove at least half. A result that contains an error scores higher (kept longer) but is not exempt: once old, it is digested and its error lines are kept in the digest (`[flagged]`, about 150 characters each, capped in total); the full original stays recoverable |
-| **Recall** | If you name a file again ("go back to `src/auth/session.ts`", "fix session.ts"), its old result comes back **in full, on the same request** (during the first 100 requests of a session it stays recoverable with `cmi_recall` instead, to protect the cache) | Matches absolute, relative or bare-name spellings |
+| **Recall** | If you name a file again ("go back to `src/auth/session.ts`", "fix session.ts"), its old result comes back **in full, on the same request** (during the first 30 requests of a session it stays recoverable with `cmi_recall` instead, to protect the cache) | Matches absolute, relative or bare-name spellings |
 | Screenshots | Stale images are replaced by a text stub | Recent images are kept |
 | Tool-call payloads | Old `write_file`/`patch` contents are shortened | Never if a later message refers to that call |
 | Duplicates | A result identical to an earlier one becomes a reference | Only above a minimum size |
@@ -47,34 +47,35 @@ Every `tool_call` keeps its `tool_result`, the output is byte-identical from one
 Compaction (summarizing the conversation when the window fills up) is still done by Hermes's
 built-in compressor. CMI just makes it happen later and less often.
 
-## Measured results (CMI 1.11.1)
+## Measured results (CMI 1.12.0)
 
-26 real coding sessions (Claude Opus/Sonnet and GPT-6 models, several projects, 636M tokens), replayed
+26 real coding sessions (Claude Opus/Sonnet and GPT-6 models, several projects, 878M tokens), replayed
 request by request with `bench/cost_replay.py`, which models the provider's cache (cache read 0.1x, write
 1.25x, 5-minute expiry). Weighted by tokens:
 
 | Measure | Average | Median | Best |
 |---|---:|---:|---:|
-| Tokens sent | −28% | −22% | −42% |
+| Tokens sent | −30% | −26% | −43% |
 | Same token budget goes further | 1.4x | | 1.7x |
-| Modelled API cost | −24% | −21% | −36% |
-| 15 sessions of 100+ requests: tokens | −29% | −28% | −38% |
-| 15 sessions of 100+ requests: modelled API cost | −25% | −23% | −34% |
+| Modelled API cost | −25% | −22% | −36% |
+| 15 sessions of 100+ requests: tokens | −30% | −33% | −43% |
+| 15 sessions of 100+ requests: modelled API cost | −25% | −24% | −34% |
 
 Live (2026-11-09): 6 Hermes sessions on Claude Sonnet 5.5, about 195 requests each, a read-only audit of
 191 project files (188M tokens): 49% fewer tokens sent (48% to 55%), modelled cost −27% (−25% to −32%).
 A task message that lists every file path keeps those files whole (named files); since 1.11.1 they are
 capped by `CMI_HOT_FILE_TOKENS` (default 32000, newest first, fixed for the turn).
 
-No session costs more with CMI (17 cheaper, 9 untouched); all sessions of 100+ requests are cheaper. Until a session has
-made 100 requests CMI does not rewrite a warm provider cache (no tier, no refresh of stale reads or named
-files); when the cache has already expired, rewriting is free and CMI shortens at once. "Modelled cost" is CMI's accounting, not a bill, and providers do
+18 of the 26 sessions are cheaper. Until a session has made 30 requests (Hermes and proxy alike;
+`CMI_WARMUP_REQUESTS`, `CMI_PROXY_WARMUP_REQUESTS`) CMI does not rewrite a warm provider cache (no tier, no
+refresh of stale reads or named files); when the cache has already expired, rewriting is free and CMI
+shortens at once. "Modelled cost" is CMI's accounting, not a bill, and providers do
 not publish how tokens count against a subscription limit.
 
-Through the proxy path, 9 further real Claude Code sessions (5,680 requests, 2026-11-09): 20% fewer
-tokens, modelled cost −12.5% weighted by requests, every shortened result recalled byte-exact (1,992
-recalls), 0 invariant violations. Eight sessions end at or below 0%; one 208-request session ends at
-+0.7%, so "never more expensive" is measured on the 26 sessions above, not guaranteed.
+Through the proxy path, 35 real Claude Code sessions (5,296 requests, 2026-11-11, write priced at 2x for
+the 1-hour cache): none costs more than without CMI; the 14 sessions of 100+ requests send 26% fewer tokens
+on average (up to 43%), modelled cost −17% on average (up to −32%); every shortened result recalled
+byte-exact (1,974 recalls), 0 invariant violations.
 
 Proxy path: `bench/claude_code_replay.py` rebuilds Claude Code sessions from `~/.claude/projects/*.jsonl`
 and replays them through the proxy's compile path. Every request is checked: tool pairs, thinking

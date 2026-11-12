@@ -945,6 +945,18 @@ def test_45_shell_writes_are_detected():
         assert f(cmd) == expected, cmd
 
 
+def test_45b_shell_write_parsing_is_cached_and_callers_get_their_own_list():
+    from cmi import toolcalls
+    toolcalls._shell_written_paths_cached.cache_clear()
+    cmd = "sed -i '' 's/a/b/' src/app.ts && echo hi > out.txt"
+    first = toolcalls.shell_written_paths(cmd)
+    first.append("mutated by the caller")
+    assert toolcalls.shell_written_paths(cmd) == ["src/app.ts", "out.txt"]
+    info = toolcalls._shell_written_paths_cached.cache_info()
+    assert (info.misses, info.hits) == (1, 1)
+    assert toolcalls.shell_written_paths("echo 'unterminated") == []
+
+
 def test_46_terminal_edit_supersedes_read_only_when_it_succeeded():
     def session(command, result):
         msgs, _ = _read_then("nothing")

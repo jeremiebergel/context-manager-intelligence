@@ -7,8 +7,11 @@ Hermes there is no compactor and CMI only does per-request selection.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
+import re
+import zlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -87,24 +90,125 @@ def _drop_nested_images(parts: Any) -> Any:
     return (out if changed else parts), count
 
 
+_PDF_PAGE_TOKENS = 2000        # Anthropic bills a PDF page as its text plus one page image
+_PDF_BYTES_PER_PAGE = 100_000  # used only when the page count cannot be read
+_PDF_PAGE_RE = re.compile(rb"/Type\s*/Page(?![A-Za-z])")
+# PDF 1.5+ writers pack page objects in compressed object streams (/Type /ObjStm, Flate).
+_PDF_OBJSTM_RE = re.compile(rb"/Type\s*/ObjStm\b[^>]*>>\s*stream\r?\n")
+_PDF_FIRST_RE = re.compile(rb"/First\s+(\d+)")
+_PDF_OBJ_RE = re.compile(rb"(\d+)\s+\d+\s+obj\b")
+_PDF_INFLATE_MAX = 16_000_000  # bytes inflated per document, bounds a hostile stream
+_document_tokens_cache: Dict[Any, int] = {}
+
+
+def _pdf_pages(raw: bytes) -> int:
+    """Distinct page objects in a PDF, visible or packed in Flate object streams. Counted by object
+    number, so a page rewritten by an incremental update (arXiv stamps, signed PDFs) counts once.
+    A stream that does not inflate is skipped; never raises."""
+    seen: set = set()
+    for m in _PDF_PAGE_RE.finditer(raw):
+        owners = list(_PDF_OBJ_RE.finditer(raw, max(0, m.start() - 4096), m.start()))
+        seen.add(int(owners[-1].group(1)) if owners else ("raw", m.start()))
+    budget = _PDF_INFLATE_MAX
+    for m in _PDF_OBJSTM_RE.finditer(raw):
+        if budget <= 0:
+            break
+        end = raw.find(b"endstream", m.end())
+        if end < 0:
+            continue
+        try:
+            inflated = zlib.decompressobj().decompress(raw[m.end():end], budget)
+        except Exception:
+            continue
+        budget -= len(inflated)
+        first = _PDF_FIRST_RE.search(raw, max(0, m.start() - 2048), m.end())
+        try:
+            nums = [int(x) for x in inflated[:int(first.group(1))].split()] if first else []
+        except ValueError:
+            nums = []
+        if first and nums and len(nums) % 2 == 0:
+            base = int(first.group(1))
+            offs = nums[1::2] + [len(inflated) - base]
+            for k, num in enumerate(nums[0::2]):
+                if _PDF_PAGE_RE.search(inflated, base + offs[k], base + offs[k + 1]):
+                    seen.add(num)
+        else:  # header unreadable: count the matches, without dedupe
+            seen.update(("packed", m.start(), i) for i, _ in enumerate(_PDF_PAGE_RE.finditer(inflated)))
+    return len(seen)
+
+
+def document_tokens(part: Any) -> Optional[int]:
+    """Billed size of a base64 document block (a PDF attached to the conversation), or None for
+    any other part. A PDF is billed per page, not by its base64 length: counted as text, a 4 MB
+    PDF weighed ~1M tokens instead of ~60K (real Claude Code session replay 2026-11-11)."""
+    if not (isinstance(part, dict) and part.get("type") == "document"):
+        return None
+    src = part.get("source")
+    data = src.get("data") if isinstance(src, dict) and src.get("type") == "base64" else None
+    if not isinstance(data, str):
+        return None
+    key = (len(data), hash(data))  # the whole text: two PDFs can share their first and last bytes
+    tokens = _document_tokens_cache.get(key)
+    if tokens is None:
+        try:
+            pages = _pdf_pages(base64.b64decode(data, validate=False))
+        except Exception:
+            pages = 0
+        # No page object found at all (encrypted or unusual file): fall back on the file size.
+        pages = pages or max(1, len(data) * 3 // 4 // _PDF_BYTES_PER_PAGE)
+        tokens = pages * _PDF_PAGE_TOKENS
+        if len(_document_tokens_cache) >= 256:
+            _document_tokens_cache.clear()
+        _document_tokens_cache[key] = tokens
+    return tokens
+
+
+def _drop_documents(parts: Any) -> Any:
+    """(parts without base64 documents at any level, their billed tokens)."""
+    tokens = 0
+    out = []
+    changed = False
+    for p in parts:
+        t = document_tokens(p)
+        if t is not None:
+            tokens += t
+            changed = True
+            continue
+        if isinstance(p, dict):
+            for k in ("content", "output"):
+                inner = p.get(k)
+                if isinstance(inner, list):
+                    deeper, n = _drop_documents(inner)
+                    if n:
+                        p = {**p, k: deeper}
+                        tokens += n
+                        changed = True
+        out.append(p)
+    return (out if changed else parts), tokens
+
+
 def estimate_messages_tokens_rough(messages: List[Dict[str, Any]], **kw: Any) -> int:
     """Host estimate, with images nested in tool results (Anthropic tool_result, Responses
     function_call_output) priced at their billed size instead of their base64
     length. Counted as text, a screenshot weighed ~100K tokens instead of ~1.6K, and cache tiers that
     evict screenshots looked far more profitable than they are (real session replay 2026-11-04).
     Images at the top level of a message (incl. OpenAI `tool` messages) are already priced by the
-    host estimator; tests/test_wire.py::test_w12 checks both shapes."""
+    host estimator; tests/test_wire.py::test_w12 checks both shapes. Base64 documents (PDF) are
+    priced per page at every level: no host estimator knows them."""
     fixed = []
     nested = 0
+    documents = 0
     for m in messages:
         c = m.get("content") if isinstance(m, dict) else None
         if isinstance(c, list):
             parts, n = _drop_nested_images(c)
-            if n:
+            parts, d = _drop_documents(parts)
+            if n or d:
                 m = {**m, "content": parts}
                 nested += n
+                documents += d
         fixed.append(m)
-    return _host_estimate(fixed, **kw) + nested * _NESTED_IMAGE_TOKENS
+    return _host_estimate(fixed, **kw) + nested * _NESTED_IMAGE_TOKENS + documents
 
 
 try:

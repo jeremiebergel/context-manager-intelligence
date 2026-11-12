@@ -110,12 +110,17 @@ TIER_LINDY = float(os.environ.get("CMI_TIER_LINDY", "0.35"))  # 0.5 (replay 2026
 # (no tier, no refresh of stale reads or named files). A short session cannot repay a rewrite, and the forced refreshes
 # ("quality beats cache") ignored the payback rule: in a replay of 26 real sessions three short ones
 # (41-63 requests) cost +16% to +20% because of them. A cold cache is still compiled (rewriting is free).
-WARMUP_REQUESTS = int(os.environ.get("CMI_WARMUP_REQUESTS", "100"))
+# 100 -> 30 (2026-11-11, forced refreshes fixed in 1.11.6): replay of 305 real Hermes sessions, total modelled cost
+# -27.1% -> -28.6%, tokens saved 31.2% -> 35.3% (GPT-6.1 30% -> 43%), both halves alike; confirmed on 81 unused
+# sessions (-34.2% -> -35.0%). A few short sessions that stop right after a rewrite end above raw (0.06% of the total).
+WARMUP_REQUESTS = int(os.environ.get("CMI_WARMUP_REQUESTS", "30"))
 # Through the proxy (Claude Code, Codex: 1-hour cache, write = 2x input) a rewrite is dearer and sessions of
 # 100-130 requests are common: replay of 14 real Claude Code sessions, 4 cost more with a 100-request wait
-# (+3% to +12%), none with 150 (those sessions are then left untouched).
+# (+3% to +12%), none with 150 (those sessions are then left untouched). 150 -> 30 (2026-11-11, after the 1.11.6
+# forced-refresh fix): replay of 35 real Claude Code sessions, none above raw, 10 cheaper, 1 within 0.1 pt;
+# sessions of 107-130 requests go from untouched to -11%..-32%.
 PROXY_TIER_LINDY = float(os.environ.get("CMI_PROXY_TIER_LINDY", "0.2"))  # 0.35 left a 538-request Claude Code session at +3.3% cost, 0.2: -0.2%
-PROXY_WARMUP_REQUESTS = int(os.environ.get("CMI_PROXY_WARMUP_REQUESTS", "150"))
+PROXY_WARMUP_REQUESTS = int(os.environ.get("CMI_PROXY_WARMUP_REQUESTS", "30"))
 SUPERSEDED_FORCES_REFRESH = os.environ.get("CMI_SUPERSEDED_REFRESH", "0") == "1"
 
 
@@ -201,6 +206,9 @@ class CMIEngine(ContextEngine):
         _LIVE_ENGINES.add(self)
         self._superseded_now: Dict[int, str] = {}
         self._must_refresh: set = set()
+        # Subset of _must_refresh forced by the opt-in CMI_SUPERSEDED_REFRESH: these replace even a
+        # rendering sent in full (the full text is now wrong); the others only restore content.
+        self._superseded_forced: set = set()
         self._hot_hit = False
         self._hot_hits: set = set()
         # Every original the engine takes out of a request is kept verbatim here; its key goes
@@ -850,8 +858,9 @@ class CMIEngine(ContextEngine):
         new_list: Optional[List[Dict[str, Any]]] = None
         # A read made obsolete by a later edit is re-rendered at the next tier or cold cache, not
         # forced mid-cache: the raw history keeps it too, and the later edit is visible after it.
-        self._must_refresh = ({i for i in self._superseded_now if i < last_user_idx}
-                              if SUPERSEDED_FORCES_REFRESH else set())
+        self._superseded_forced = ({i for i in self._superseded_now if i < last_user_idx}
+                                   if SUPERSEDED_FORCES_REFRESH else set())
+        self._must_refresh = set(self._superseded_forced)
 
         for idx, info in tool_results.items():
             state = self._decide_render(idx, info, msgs, last_user_idx, hot_files)
@@ -992,9 +1001,12 @@ class CMIEngine(ContextEngine):
         must = set() if warming else self._must_refresh
         stable = list(compiled)
         for i in range(len(msgs)):
-            if i in must:
-                continue
             p = previous(i)
+            # A forced refresh restores content. A message already sent in full has nothing to
+            # restore: a later pass shortening it (duplicate collapse) waits for a tier. An obsolete
+            # read under the opt-in superseded refresh is the exception: its full text is now wrong.
+            if i in must and (p is not msgs[i] or i in self._superseded_forced):
+                continue
             if p is not None:
                 stable[i] = p
             elif i < self._frozen_upto:

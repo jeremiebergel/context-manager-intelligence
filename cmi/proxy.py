@@ -133,6 +133,17 @@ class Sessions:
         """The key this conversation had before its first assistant turn existed."""
         return Sessions._base(route, body, msgs).hexdigest()[:24]
 
+    @staticmethod
+    def keys(route: str, body: Dict[str, Any], msgs: List[Dict[str, Any]]) -> Tuple[str, str]:
+        """(key, pending_key) from one pass: the system prompt and the first user message (which
+        may carry a multi-megabyte attachment) are serialized once per request, not twice."""
+        h = Sessions._base(route, body, msgs)
+        pending = h.hexdigest()[:24]
+        turn = Sessions._first_turn(msgs)
+        if turn is not None:
+            h.update(b"turn\0" + turn.encode("utf-8", "replace"))
+        return h.hexdigest()[:24], pending
+
     def get(self, key: str, model: str, adopt: Optional[str] = None) -> Tuple[CMIEngine, threading.Lock, List[int]]:
         with self._lock:
             hit = self._lru.get(key)
@@ -190,9 +201,8 @@ def compile_request(sessions: Sessions, route: str, body: Dict[str, Any]) -> Tup
     if not msgs:
         return body, stats
     try:
-        key = Sessions.key(route, body, msgs)
-        eng, lock, learned = sessions.get(key, str(body.get("model", "")),
-                                          adopt=Sessions.pending_key(route, body, msgs))
+        key, pending = Sessions.keys(route, body, msgs)
+        eng, lock, learned = sessions.get(key, str(body.get("model", "")), adopt=pending)
     except Exception:
         log.warning("CMI could not open a session; forwarding unchanged", exc_info=True)
         return body, stats
@@ -211,9 +221,9 @@ def compile_request(sessions: Sessions, route: str, body: Dict[str, Any]) -> Tup
             return body, stats
     if new_body is None:
         return body, stats
-    before = len(json.dumps(body, ensure_ascii=False))
-    after = len(json.dumps(new_body, ensure_ascii=False))
-    stats.update(changed=True, chars_before=before, chars_after=after, session=key[:8])
+    # Sizes are filled in by the caller from the bytes it already has: serializing both bodies
+    # here only to count them cost more than the compile itself on long conversations.
+    stats.update(changed=True, session=key[:8])
     return new_body, stats
 
 
@@ -354,10 +364,9 @@ def make_handler(sessions: Sessions, anthropic: Upstream, openai: Upstream, verb
                         body = scoped
                     new_body, stats = compile_request(sessions, path, body)
                     if scoped is not None and not stats.get("changed"):
-                        new_body, stats = body, {**stats, "changed": True, "session": "toolscope",
-                                                 "chars_before": len(raw), "chars_after": 0}
-                        stats["chars_after"] = len(json.dumps(body, ensure_ascii=False))
+                        new_body, stats = body, {**stats, "changed": True, "session": "toolscope"}
                     if stats.get("changed"):
+                        size_before = len(raw)
                         try:
                             # ASCII escapes: a lone surrogate from a cut emoji survives as \udXXX.
                             raw = json.dumps(new_body).encode("ascii")
@@ -365,9 +374,9 @@ def make_handler(sessions: Sessions, anthropic: Upstream, openai: Upstream, verb
                             log.warning("CMI could not serialize the compiled body; forwarding original",
                                         exc_info=True)
                         if verbose:
-                            log.info("cmi %s session=%s msgs=%d %d -> %d chars (%.0f ms)", stats["route"],
-                                     stats["session"], stats["messages"], stats["chars_before"],
-                                     stats["chars_after"], (time.perf_counter() - t) * 1000)
+                            log.info("cmi %s session=%s msgs=%d %d -> %d bytes (%.0f ms)", stats["route"],
+                                     stats["session"], stats["messages"], size_before,
+                                     len(raw), (time.perf_counter() - t) * 1000)
             self._forward(raw)
 
         def _serve_recall(self, key: str) -> None:

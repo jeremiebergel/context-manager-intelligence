@@ -27,6 +27,8 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
+from . import _fs
+
 LABEL = "com.cmi.proxy"
 UNIT = "cmi-proxy.service"
 TASK = "cmi-proxy"
@@ -73,10 +75,25 @@ def paths(home: Optional[Path] = None, plat: Optional[str] = None) -> dict:
     return p
 
 
+def _private_dir(path: Path) -> None:
+    """Owner-only directory: backups are copies of editor and agent settings (which may hold
+    keys), logs name sessions and local paths."""
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        _fs.chmod_private(path, 0o700)
+    except OSError:
+        pass
+
+
 def _backup(path: Path, backups: Path) -> None:
     if path.exists():
-        backups.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, backups / f"{path.name}.{time.strftime('%Y%m%d-%H%M%S')}")
+        _private_dir(backups)
+        copy = backups / f"{path.name}.{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.copy2(path, copy)
+        try:
+            _fs.chmod_private(copy, 0o600)
+        except OSError:
+            pass
 
 
 def _as_list(exe: Union[str, Sequence[str]]) -> List[str]:
@@ -364,7 +381,7 @@ def install(port: int = 8787, editors: bool = True, start: bool = True, home: Op
     cmd = _as_list(exe) if exe else default_command(plat)
     say: List[str] = []
     if plat == "darwin":
-        p["logs"].mkdir(parents=True, exist_ok=True)
+        _private_dir(p["logs"])
         p["plist"].parent.mkdir(parents=True, exist_ok=True)
         _backup(p["plist"], p["backups"])
         p["plist"].write_bytes(plistlib.dumps(build_plist(cmd, port, p["logs"])))
