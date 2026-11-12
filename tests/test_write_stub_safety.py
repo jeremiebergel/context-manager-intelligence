@@ -4,6 +4,7 @@ Barrier 1 (lifecycle): a shortened past write carries no payload key, so an imit
 the tool itself ("missing content"). Barrier 2 (write_guard): a payload that is CMI's short form is
 blocked by a ``pre_tool_call`` hook. The Hermes tests run against the real Hermes code.
 """
+import copy
 import importlib.util
 import json
 import os
@@ -119,3 +120,174 @@ def test_guard_runs_through_real_hermes_plugin_loading(tmp_path):
     out = json.loads(r.stdout.strip().splitlines()[-1])
     assert out["blocked"] and "Blocked by CMI" in out["blocked"], out
     assert out["allowed"] is None
+
+
+# -- 1.12.2: the cmi_omitted note itself, and barrier 3 (flag a stub write that went through) --------
+
+def _note():  # the real 1.12.1 note, from the real renderer
+    return _shortened("write_file", {"path": "/p/a.md", "content": "x" * 500})["cmi_omitted"]
+
+
+@pytest.mark.parametrize("payload", [
+    lambda: _note(),
+    lambda: "  " + _note() + "\nmore",
+    lambda: "# notes\n\n" + _note() + "\n",            # the whole note embedded in a file
+])
+def test_guard_blocks_the_cmi_omitted_note_copied_into_a_payload(payload):
+    for tool, key in (("write_file", "content"), ("patch", "new_string"), ("Write", "content")):
+        out = refuse_stub_write(tool_name=tool, args={"path": "/p/a.md", key: payload()})
+        assert out and out["action"] == "block", (tool, payload())
+
+
+def test_guard_blocks_any_call_that_carries_the_cmi_omitted_key():
+    from cmi.lifecycle import OMITTED_ARG_KEY
+    for args in ({"path": "/p/a.md", OMITTED_ARG_KEY: _note()},
+                 {"path": "/p/a.md", "content": "", OMITTED_ARG_KEY: _note()},       # empty file otherwise
+                 {"path": "/p/a.md", "content": "real text", OMITTED_ARG_KEY: "x"}):
+        out = refuse_stub_write(tool_name="write_file", args=args)
+        assert out and out["action"] == "block" and OMITTED_ARG_KEY in out["message"], args
+
+
+def test_guard_lets_a_mention_of_the_note_wording_through():
+    from cmi.lifecycle import OMITTED_NOTE_TAIL
+    text = "The note ends with" + OMITTED_NOTE_TAIL + " It is documented in REFERENCE.md.\n"
+    assert refuse_stub_write(tool_name="write_file", args={"path": "/p/doc.md", "content": text}) is None
+
+
+def _engine():
+    from cmi.engine import CMIEngine
+    return CMIEngine()
+
+
+def _openai_session(write_content, write_result='{"bytes_written": 120}'):
+    read_body = '{"content": "1|original line one\\n2|original line two", "total_lines": 2}'
+    return [
+        {"role": "system", "content": "s"},
+        {"role": "user", "content": "update a.md"},
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"id": "r1", "type": "function", "function": {"name": "read_file", "arguments": json.dumps({"path": "/p/a.md"})}}]},
+        {"role": "tool", "tool_call_id": "r1", "content": read_body},
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"id": "w1", "type": "function", "function": {"name": "write_file",
+                                                         "arguments": json.dumps({"path": "/p/a.md", "content": write_content})}}]},
+        {"role": "tool", "tool_call_id": "w1", "content": write_result},
+    ], read_body
+
+
+def test_engine_flags_a_stub_write_that_went_through_and_stores_the_last_known_content():
+    stub = "[CMI digest] " + KEY + " [read_file] read /p/a.md (2 lines)"
+    msgs, read_body = _openai_session(stub)
+    eng = _engine()
+    out = eng.select_context(msgs)
+    assert out is not None, "the warning is sent even when nothing else is shortened"
+    flagged = out[-1]["content"]
+    assert flagged.startswith('{"bytes_written": 120}') and "[CMI warning]" in flagged and "/p/a.md" in flagged
+    key = flagged.split("is stored as cmi:")[1].split(";")[0].split()[0]
+    assert eng.store.get(key) == read_body, "the last read is recoverable byte for byte"
+    assert msgs[-1]["content"] == '{"bytes_written": 120}', "the caller's history is never mutated"
+    again = _engine().select_context(msgs)
+    assert again[-1]["content"] == flagged, "deterministic: the same history gives the same bytes"
+
+
+def test_engine_flags_the_empty_imitation_and_skips_refused_or_blocked_writes():
+    msgs, _ = _openai_session("")
+    msgs[4]["tool_calls"][0]["function"]["arguments"] = json.dumps(
+        {"path": "/p/a.md", "content": "", "cmi_omitted": _note()})
+    assert "[CMI warning]" in _engine().select_context(msgs)[-1]["content"]
+    for result in ('{"error": "write_file: missing required field \'content\'"}',
+                   '{"error": "Blocked by CMI: `content` holds CMI\'s short form"}'):
+        msgs, _ = _openai_session("[CMI dup] identical to an earlier result", write_result=result)
+        out = _engine().select_context(msgs)
+        assert out is None or "[CMI warning]" not in json.dumps(out)
+    msgs, _ = _openai_session("real new content\n")
+    out = _engine().select_context(msgs)
+    assert out is None or "[CMI warning]" not in json.dumps(out)
+
+
+def test_engine_flags_a_stub_write_in_the_anthropic_shape():
+    stub = "[CMI: narration omitted] " + KEY
+    msgs = [
+        {"role": "user", "content": "go"},
+        {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_1", "name": "Write",
+                                           "input": {"file_path": "/p/b.md", "content": stub}}]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1",
+                                      "content": [{"type": "text", "text": "File created successfully"}]}]},
+    ]
+    out = _engine().select_context(msgs)
+    part = out[-1]["content"][0]
+    texts = [p["text"] for p in part["content"]]
+    assert texts[0] == "File created successfully" and "[CMI warning]" in texts[-1]
+    assert "no earlier content of /p/b.md" in texts[-1]
+    part["is_error"] = True
+    msgs[-1]["content"][0]["is_error"] = True
+    out = _engine().select_context(msgs)
+    assert out is None or "[CMI warning]" not in json.dumps(out)
+
+
+@needs_hermes
+def test_flagged_write_round_trip_restores_the_file_with_the_real_hermes_tools(tmp_path):
+    """End to end on the real Hermes handlers: the stub write lands, CMI flags it at the next request
+    with a recall key, and writing the recalled content back restores the file."""
+    from tools.file_tools import _handle_read_file, _handle_write_file
+    target = tmp_path / "a.md"
+    target.write_text("line one\nline two\n")
+    read_body = _handle_read_file({"path": str(target)}, task_id="t")
+    stub = "[CMI digest] " + KEY + " [read_file] read " + str(target)
+    wrote = _handle_write_file({"path": str(target), "content": stub}, task_id="t")
+    assert target.read_text() == stub  # the damage this barrier exists for
+    msgs = [
+        {"role": "user", "content": "edit"},
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "r", "type": "function", "function": {
+            "name": "read_file", "arguments": json.dumps({"path": str(target)})}}]},
+        {"role": "tool", "tool_call_id": "r", "content": read_body},
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "w", "type": "function", "function": {
+            "name": "write_file", "arguments": json.dumps({"path": str(target), "content": stub})}}]},
+        {"role": "tool", "tool_call_id": "w", "content": wrote},
+    ]
+    eng = _engine()
+    flagged = eng.select_context(msgs)[-1]["content"]
+    key = flagged.split("is stored as cmi:")[1].split(";")[0].split()[0]
+    recalled = json.loads(eng.store.get(key))["content"]
+    restored = "".join(line.split("|", 1)[1] + "\n" for line in recalled.splitlines())
+    _handle_write_file({"path": str(target), "content": restored}, task_id="t")
+    assert target.read_text() == "line one\nline two\n"
+
+
+@pytest.mark.parametrize("route", ["/v1/messages", "/v1/chat/completions", "/v1/responses"])
+def test_proxy_flags_a_stub_write_on_every_wire(tmp_path, route):
+    """Barrier 3 through the proxy (Claude Code, OpenAI clients, Codex): the warning reaches the wire."""
+    from cmi import proxy
+    stub = "[CMI digest] " + KEY + " [Read] read /p/c.md"
+    if route == "/v1/messages":
+        body = {"model": "claude-sonnet-5-5", "max_tokens": 10, "messages": [
+            {"role": "user", "content": "go"},
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_9", "name": "Write",
+                                               "input": {"file_path": "/p/c.md", "content": stub}}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_9", "content": "ok"}]}]}
+    elif route == "/v1/chat/completions":
+        body = {"model": "gpt-6.1-sol", "messages": [
+            {"role": "user", "content": "go"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "c9", "type": "function", "function": {
+                "name": "write_file", "arguments": json.dumps({"path": "/p/c.md", "content": stub})}}]},
+            {"role": "tool", "tool_call_id": "c9", "content": "ok"}]}
+    else:
+        body = {"model": "gpt-6.1-sol", "input": [
+            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]},
+            {"type": "function_call", "call_id": "c9", "name": "write_file",
+             "arguments": json.dumps({"path": "/p/c.md", "content": stub})},
+            {"type": "function_call_output", "call_id": "c9", "output": "ok"}]}
+    new, stats = proxy.compile_request(proxy.Sessions(str(tmp_path)), route, copy.deepcopy(body))
+    sent = json.dumps(new, ensure_ascii=False)
+    assert "[CMI warning]" in sent and "/p/c.md now holds that stub" in sent, (route, stats)
+    assert json.dumps(body) != sent
+
+
+def test_engine_does_not_flag_a_stub_write_already_repaired_by_a_later_full_write():
+    msgs, _ = _openai_session("[CMI dup] identical to an earlier result")
+    msgs += [
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "w2", "type": "function", "function": {
+            "name": "write_file", "arguments": json.dumps({"path": "/p/a.md", "content": "fixed text\n"})}}]},
+        {"role": "tool", "tool_call_id": "w2", "content": '{"bytes_written": 11}'},
+    ]
+    out = _engine().select_context(msgs)
+    assert out is None or "[CMI warning]" not in json.dumps(out)

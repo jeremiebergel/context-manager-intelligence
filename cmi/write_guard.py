@@ -3,9 +3,15 @@
 CMI shows old tool results and old write payloads in short form. A model can copy one of those short
 forms into a NEW write, which would put the stub in the file instead of the content (seen live in
 1.12.0: a ``[CMI: content omitted ...]`` stub with an invented recall key written as a new file).
-Since 1.12.1 a shortened past write carries no payload key at all, so imitating it fails in the tool
-("missing content"); this hook is the second barrier, for every other stub form: a write payload that
-starts with a CMI stub, or that contains a write stub, is blocked with the way to recover the original.
+Three barriers:
+  1. since 1.12.1 a shortened past write carries no payload key, so imitating it fails in the tool
+     ("missing content");
+  2. this hook blocks a write whose payload starts with a CMI stub, embeds a write stub or the
+     ``cmi_omitted`` note, or that carries the ``cmi_omitted`` key, and says how to get the original
+     back (runs where the host runs plugin hooks: Hermes with the plugin enabled);
+  3. everywhere else (Hermes engine-only, the proxy), the engine flags a stub write that went through
+     in its own result at the next request, with the file's last known content stored under a recall
+     key (``CMIEngine._flag_stub_writes``).
 
 Deterministic, fail-open (any error lets the call through), no I/O.
 """
@@ -15,7 +21,8 @@ import json
 import re
 from typing import Any, Dict, Iterator, Optional, Tuple
 
-from .lifecycle import CONTENT_BEARING_ARG_TOOLS, _CONTENT_ARG_KEYS, _MORE_ARG_KEYS
+from .lifecycle import (CONTENT_BEARING_ARG_TOOLS, OMITTED_ARG_KEY, OMITTED_NOTE_HEAD, OMITTED_NOTE_MID,
+                        OMITTED_NOTE_TAIL, _CONTENT_ARG_KEYS, _MORE_ARG_KEYS)
 
 # Any CMI stub head: "[CMI digest]", "[CMI one_liner]", "[CMI dup]", "[CMI batch item 3]",
 # "[CMI: narration omitted]", "[CMI: content omitted — ...]", "[CMI project memory]".
@@ -24,6 +31,11 @@ _STUB_HEAD_RE = re.compile(r"\s*\[CMI[: ][^\]\n]{1,300}\]")
 _WRITE_STUB_RE = re.compile(
     r"\[CMI: (?:content omitted — already written to [^\n]{1,4096}?, [\d,]+ chars\. File on disk is the source of"
     r" truth\.|\w+ omitted — [\d,]+ chars, applied to [^\n]{1,4096}?\.)\]")
+# The ``cmi_omitted`` note of 1.12.1+ shortened past writes: at the head of a payload, or whole (with
+# its recall key) anywhere in it. Built from the wording lifecycle.py writes, so the two stay in sync.
+_NOTE_HEAD_RE = re.compile(r"\s*" + re.escape(OMITTED_NOTE_HEAD) + r"[^\n]{1,4000}?" + re.escape(OMITTED_NOTE_MID))
+_NOTE_RE = re.compile(re.escape(OMITTED_NOTE_HEAD) + r"[^\n]{0,4000}?cmi:[0-9a-f]{8,64}[^\n]{0,4000}?"
+                      + re.escape(OMITTED_NOTE_MID) + r"[^\n]{1,4096}?" + re.escape(OMITTED_NOTE_TAIL))
 _KEY_RE = re.compile(r"cmi:[0-9a-f]{8,64}")
 _PAYLOAD_KEYS = _CONTENT_ARG_KEYS + _MORE_ARG_KEYS + ("file_content",)
 
@@ -48,11 +60,16 @@ def _payloads(args: Dict[str, Any]) -> Iterator[Tuple[str, str]]:
 
 def stub_in_payload(tool_name: str, args: Any) -> Optional[Tuple[str, str]]:
     """``(key, stub)`` when a write payload is (or starts with, or embeds a write stub of) CMI's own
-    short form; ``None`` otherwise. Only content-bearing tools are checked."""
+    short form, or when the call carries the ``cmi_omitted`` note of a shortened past call (a model
+    never sends that key itself: such a call is an imitation); ``None`` otherwise. Only
+    content-bearing tools are checked."""
     if not isinstance(args, dict) or _bare(tool_name) not in CONTENT_BEARING_ARG_TOOLS:
         return None
+    if OMITTED_ARG_KEY in args:
+        return OMITTED_ARG_KEY, str(args[OMITTED_ARG_KEY])[:400]
     for key, value in _payloads(args):
-        m = _STUB_HEAD_RE.match(value) or _WRITE_STUB_RE.search(value)
+        m = (_STUB_HEAD_RE.match(value) or _NOTE_HEAD_RE.match(value)
+             or _WRITE_STUB_RE.search(value) or _NOTE_RE.search(value))
         if m:
             return key, value[m.start():m.end() + 80].strip()
     return None
@@ -70,6 +87,11 @@ def refuse_stub_write(tool_name: str = "", args: Any = None, **_kw: Any) -> Opti
     keys = _KEY_RE.findall(stub)
     how = (f"get the original with cmi_recall(\"{keys[0]}\") (if that key does not exist, re-read the file)"
            if keys else "re-read the file")
+    if key == OMITTED_ARG_KEY:
+        return {"action": "block",
+                "message": (f"Blocked by CMI: this {tool_name or 'call'} copies the short form CMI shows for a past "
+                            f"call (`{OMITTED_ARG_KEY}`), so it carries no real content. {how[0].upper()}{how[1:]} "
+                            f"and send the full content, without `{OMITTED_ARG_KEY}`.")}
     return {"action": "block",
             "message": (f"Blocked by CMI: `{key}` holds CMI's short form of earlier content "
                         f"({json.dumps(stub[:120], ensure_ascii=False)}), not the content itself; running "

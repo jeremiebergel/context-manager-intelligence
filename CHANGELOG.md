@@ -2,6 +2,21 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.2 (2026-11-12)
+
+- Safety, third barrier: a write that went through with CMI's short form as its payload is flagged in
+  its own result at the next request, on every host (Hermes with or without the plugin hook, the proxy
+  for Claude Code, OpenAI clients and Codex). The flag names the file and stores its last known content
+  (last full write or last read in the conversation) under a recall key, so the model restores the file
+  at its next step. A write repaired later by a full write is not flagged. Checked end to end on the real
+  Hermes tools: the stub lands, the flag points to the recalled content, writing it back restores the
+  file byte for byte. A scan of 5,376 past write/patch calls found 34 stub payloads since 2026-09-27
+  (the 1.12.0 write stub, copied by the model); none is left in a file today.
+- The `pre_tool_call` guard also blocks the 1.12.1 `cmi_omitted` note copied into a payload (at its head,
+  or whole anywhere), and any write call that carries the `cmi_omitted` key (only an imitation of a
+  shortened past call has it; with an empty `content` it would have written an empty file). The note
+  wording lives in one place (`lifecycle.py`) for the renderer and the guard; its bytes are unchanged.
+
 ## 1.12.1 (2026-11-12)
 
 - Safety: a model can no longer put a CMI stub in a file by copying CMI's short form of a past write.

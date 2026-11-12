@@ -62,6 +62,10 @@ _MORE_ARG_KEYS = ("old_string", "file_text", "new_str", "old_str", "new_source",
 # The note that replaces the removed payload keys of a shortened past write (see
 # render_tool_call_args_digest).
 OMITTED_ARG_KEY = "cmi_omitted"
+# Its wording, shared with write_guard.py so a copy of the note into a payload is recognised.
+OMITTED_NOTE_HEAD = "CMI removed "
+OMITTED_NOTE_MID = " from this past call, already applied to "
+OMITTED_NOTE_TAIL = ". A new call must carry its full payload."
 TOOL_ARGS_RECENT_AGE: int = 2       # same recency window as results
 TOOL_ARGS_MIN_CHARS: int = 300      # profitability floor for the payload itself
 
@@ -452,8 +456,7 @@ class ToolResultLifecycle:
             removed.append(f"{key} ({len(v):,} chars){ref}")
             main_done = main_done or key in _CONTENT_ARG_KEYS
         if removed:
-            out[OMITTED_ARG_KEY] = (f"CMI removed {', '.join(removed)} from this past call, already applied "
-                                    f"to {path}. A new call must carry its full payload.")
+            out[OMITTED_ARG_KEY] = f"{OMITTED_NOTE_HEAD}{', '.join(removed)}{OMITTED_NOTE_MID}{path}{OMITTED_NOTE_TAIL}"
         self._digest_cache[cache_key] = json.dumps(out, ensure_ascii=False)
         return out
 

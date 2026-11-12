@@ -855,7 +855,9 @@ class CMIEngine(ContextEngine):
         self._lexical_hits = self._lexical_recall(msgs, user_idx, tool_results, horizon=last_user_idx)
         self._hot_hits = self._hot_results(msgs, tool_results, hot_files, horizon=last_user_idx)
 
-        new_list: Optional[List[Dict[str, Any]]] = None
+        # A write that put CMI's short form in a file is flagged first, whatever else happens.
+        new_list: Optional[List[Dict[str, Any]]] = self._flag_stub_writes(msgs)
+        flagged = new_list is not None
         # A read made obsolete by a later edit is re-rendered at the next tier or cold cache, not
         # forced mid-cache: the raw history keeps it too, and the later edit is visible after it.
         self._superseded_forced = ({i for i in self._superseded_now if i < last_user_idx}
@@ -936,11 +938,12 @@ class CMIEngine(ContextEngine):
             for old, new in zip(msgs, new_list) if old is not new
         )
         self._record_telemetry(raw_tokens, compiled_tokens, raw_tokens - compiled_tokens)
-        if compiled_tokens >= raw_tokens:
+        if compiled_tokens >= raw_tokens and not flagged:
             # Every pass above only writes to new_list when its OWN edit is
             # locally profitable (each guards with len(replacement) <
             # len(original)). A net non-improvement here means estimator
             # rounding wiped out a tiny gain — safe to fail closed to None.
+            # A stub-write warning is sent whatever it costs.
             return None
         return new_list
 
@@ -1238,6 +1241,155 @@ class CMIEngine(ContextEngine):
                             out.setdefault(prev_ri, "reread")
                     reads.setdefault(base, []).append((ri, path, argkey))
         return out
+
+    # -- Stub writes (1.12.2) ---------------------------------------------------
+    # Every host gets this barrier, hook or not: a write that went through with CMI's short form as
+    # its payload (copied from a digest or from a shortened past call) is flagged in its own result,
+    # with the file's last known content stored under a recall key, so the model restores the file at
+    # its very next step. The write_guard hook blocks such a write beforehand when the host runs it.
+    _FULL_WRITE_TOOLS = frozenset({"write_file", "write", "create_file", "write_to_file"})
+
+    def _flag_stub_writes(self, msgs) -> Optional[List[Dict[str, Any]]]:
+        """Copy-on-write list with each stub write's result flagged, or None. Deterministic (same
+        history, same bytes) and appended to a result that is new when it first appears, so the
+        cached prefix is never rewritten for it."""
+        from .write_guard import stub_in_payload
+        scan = self.__dict__.setdefault("_stub_scan", {})  # tool call id -> hit (ids never change)
+        if len(scan) > 50000:
+            scan.clear()
+        result_at: Dict[str, int] = {}
+        hits = []
+        for i, m in enumerate(msgs):
+            if not isinstance(m, dict):
+                continue
+            if m.get("role") == "tool" and m.get("tool_call_id"):
+                result_at[str(m["tool_call_id"])] = i
+            elif m.get("role") == "user" and isinstance(m.get("content"), list):
+                for p in m["content"]:
+                    if isinstance(p, dict) and p.get("type") == "tool_result" and p.get("tool_use_id"):
+                        result_at.setdefault(str(p["tool_use_id"]), i)
+            elif m.get("role") == "assistant":
+                ids = [str(tc.get("id") or "") for tc in m.get("tool_calls") or [] if isinstance(tc, dict)]
+                if isinstance(m.get("content"), list):
+                    ids += [str(p.get("id") or "") for p in m["content"]
+                            if isinstance(p, dict) and p.get("type") == "tool_use"]
+                if ids and all(t in scan and scan[t] is None for t in ids):
+                    continue  # already scanned, nothing found: skip parsing the arguments again
+                for tc_id, name, args in self._calls_of(m):
+                    if tc_id not in scan:
+                        scan[tc_id] = stub_in_payload(name, args)
+                    if scan[tc_id] is not None:
+                        hits.append((i, tc_id, name, args, scan[tc_id]))
+        out = None
+        for i, tc_id, name, args, (_key, stub) in hits:
+            ri = result_at.get(tc_id)
+            if ri is None:
+                continue
+            text, is_error = self._result_part(msgs[ri], tc_id)
+            if is_error or _FAILED_RESULT_RE.match(text[:200]) or "Blocked by CMI" in text[:400]:
+                continue  # refused or blocked: nothing was written
+            path = next(iter(_write_paths(args)), "") or "the target file"
+            if self._rewritten_later(msgs, i, path, result_at):
+                continue  # already repaired: a later full write replaced the stub
+            known, how = self._last_known_content(msgs, i, path, result_at)
+            ref = self._stash(known) if known else None
+            note = (f"\n\n[CMI warning] This {name} call sent CMI's short form "
+                    f"({json.dumps(stub[:80], ensure_ascii=False)}) instead of real content, so {path} now "
+                    f"holds that stub, not its content. Fix it before anything else: ")
+            if ref:
+                note += f"its last known content ({how}) is stored as{ref}; recall it, then write the full content back."
+            else:
+                note += (f"no earlier content of {path} is in this conversation; re-create it, or restore it "
+                         f"from version control.")
+            out = self._cow(out, msgs, ri)
+            self._append_result_text(out[ri], tc_id, note)
+            self.telemetry["stub_writes_flagged"] = self.telemetry.get("stub_writes_flagged", 0) + 1
+        return out
+
+    def _rewritten_later(self, msgs, after, path, result_at) -> bool:
+        """A full, non-stub write of ``path`` succeeded after message ``after``."""
+        from .write_guard import stub_in_payload
+        for j in range(after + 1, len(msgs)):
+            m = msgs[j]
+            if not isinstance(m, dict) or m.get("role") != "assistant":
+                continue
+            for tc_id, name, args in self._calls_of(m):
+                if _bare_tool_name(name) not in self._FULL_WRITE_TOOLS or stub_in_payload(name, args) is not None:
+                    continue
+                if not any(self._same_file(p, path) for p in _write_paths(args)):
+                    continue
+                ri = result_at.get(tc_id)
+                if ri is None:
+                    continue
+                text, is_error = self._result_part(msgs[ri], tc_id)
+                if not is_error and not _FAILED_RESULT_RE.match(text[:200]) and "Blocked by CMI" not in text[:400]:
+                    return True
+        return False
+
+    def _last_known_content(self, msgs, before, path, result_at) -> Tuple[Optional[str], str]:
+        """The newest full copy of ``path`` before message ``before``: a full write's payload or a
+        read's result, as the raw history holds them. Partial edits after it are mentioned."""
+        from .write_guard import stub_in_payload
+        edited = False
+        for j in range(before - 1, -1, -1):
+            m = msgs[j]
+            if not isinstance(m, dict) or m.get("role") != "assistant":
+                continue
+            for tc_id, name, args in reversed(list(self._calls_of(m))):
+                bare = _bare_tool_name(name)
+                ri = result_at.get(tc_id)
+                if ri is None:
+                    continue
+                text, is_error = self._result_part(msgs[ri], tc_id)
+                if is_error or _FAILED_RESULT_RE.match(text[:200]):
+                    continue
+                later = ", before later edits" if edited else ""
+                if bare in _WRITE_TOOLS:
+                    if not any(self._same_file(p, path) for p in _write_paths(args)):
+                        continue
+                    full = args.get("content") if bare in self._FULL_WRITE_TOOLS else None
+                    if isinstance(full, str) and full and stub_in_payload(name, args) is None:
+                        return full, f"as last written{later}"
+                    edited = True
+                elif bare in _READ_TOOLS:
+                    rpath = _path_arg(args)
+                    if rpath and self._same_file(rpath, path) and text.strip():
+                        return text, f"as last read{later}"
+        return None, ""
+
+    @staticmethod
+    def _result_part(msg, tc_id) -> Tuple[str, bool]:
+        """(text, is_error) of the result for ``tc_id`` in an OpenAI tool message or an Anthropic
+        user message holding tool_result parts."""
+        if not isinstance(msg, dict):
+            return "", False
+        c = msg.get("content")
+        if msg.get("role") == "tool":
+            if isinstance(c, list):
+                return "\n".join(p.get("text", "") for p in c if isinstance(p, dict) and p.get("type") == "text"), False
+            return (c if isinstance(c, str) else ""), False
+        for p in c if isinstance(c, list) else []:
+            if isinstance(p, dict) and p.get("type") == "tool_result" and str(p.get("tool_use_id")) == tc_id:
+                inner = p.get("content")
+                if isinstance(inner, list):
+                    inner = "\n".join(ip.get("text", "") for ip in inner if isinstance(ip, dict) and ip.get("type") == "text")
+                return (inner if isinstance(inner, str) else ""), bool(p.get("is_error"))
+        return "", False
+
+    @staticmethod
+    def _append_result_text(msg, tc_id, text) -> None:
+        """Append ``text`` to the (deep-copied) result for ``tc_id``, in both message shapes."""
+        if msg.get("role") == "tool":
+            c = msg.get("content")
+            msg["content"] = (c + text if isinstance(c, str) else
+                              list(c) + [{"type": "text", "text": text}] if isinstance(c, list) else text.lstrip())
+            return
+        for p in msg.get("content") or []:
+            if isinstance(p, dict) and p.get("type") == "tool_result" and str(p.get("tool_use_id")) == tc_id:
+                inner = p.get("content")
+                p["content"] = (inner + text if isinstance(inner, str) else
+                                list(inner) + [{"type": "text", "text": text}] if isinstance(inner, list)
+                                else text.lstrip())
 
     def _write_succeeded(self, msgs, ri) -> bool:
         """A failed patch leaves the file unchanged: marking the read outdated would hide the
