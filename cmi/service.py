@@ -466,6 +466,23 @@ def uninstall(home: Optional[Path] = None, stop: bool = True, plat: Optional[str
     return say
 
 
+def _version_lines(h: dict, plat: str) -> List[str]:
+    """The running proxy keeps the code it started with: after an upgrade it must be restarted."""
+    from .versioning import running_version
+    installed, running = running_version(), h.get("version")
+    if running == installed:
+        return [f"version: {running}"]
+    if plat == "linux":
+        how = f"`systemctl --user restart {UNIT}`"
+    elif plat == "win32":
+        how = "sign out and back in (the scheduled task starts it at logon)"
+    else:
+        how = f"`launchctl kickstart -k gui/$(id -u)/{LABEL}`"
+    was = running or "a version older than 1.12.4"
+    return [f"  WARNING: the proxy still runs {was} but CMI {installed} is installed: restart it to load "
+            f"the new code ({how}; open conversations then start a fresh engine)"]
+
+
 def status(port: int = 8787, home: Optional[Path] = None, plat: Optional[str] = None,
            manage: Optional[bool] = None) -> List[str]:
     plat = _platform(plat)
@@ -473,6 +490,8 @@ def status(port: int = 8787, home: Optional[Path] = None, plat: Optional[str] = 
     p = paths(home, plat)
     h = health(port)
     say = [f"proxy on 127.0.0.1:{port}: " + (f"running ({h.get('sessions', 0)} active conversation(s))" if h else "NOT answering")]
+    if h:
+        say += _version_lines(h, plat)
     if plat == "win32":
         task = manage and _run(["schtasks", "/Query", "/TN", TASK]).returncode == 0
         say.append("service: " + ("scheduled task present" if task else

@@ -44,6 +44,7 @@ from .compat import default_home
 from .engine import CMIEngine, PROXY_TIER_LINDY, PROXY_WARMUP_REQUESTS
 from .store import RecallStore
 from .toolscope import HEADER as TOOLS_HEADER, parse_allow, scope_tools
+from .versioning import running_version
 from .wire import strip_cache_control, to_canonical
 
 log = logging.getLogger("cmi.proxy")
@@ -327,7 +328,8 @@ def make_handler(sessions: Sessions, anthropic: Upstream, openai: Upstream, verb
             if self.path.startswith("/cmi/"):
                 return self._serve_recall(self.path[5:])
             if self.path == "/cmi-health":
-                return self._send_json(200, {"ok": True, "sessions": len(sessions._lru)})
+                return self._send_json(200, {"ok": True, "sessions": len(sessions._lru),
+                                             "version": running_version()})
             self._forward(None)
 
         def do_POST(self) -> None:

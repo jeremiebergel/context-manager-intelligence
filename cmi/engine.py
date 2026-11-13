@@ -25,10 +25,25 @@ from .lifecycle import ToolResultLifecycle, _tokens_rough
 from .cost_guard import CostShadow
 from .index import MIN_CHARS as INDEX_MIN_CHARS, OutputIndex
 from .stats import StatsLedger, report as stats_report
+from .versioning import running_version, stale_install
 from .working_set import KnownIndex, WorkingSet, extract_paths, match_known
 from .store import RecallStore
 
 logger = logging.getLogger(__name__)
+
+_STALE_WARNED = False
+
+
+def _warn_if_stale_install() -> None:
+    """Log once per process when the CMI on disk is not the one running (update without restart)."""
+    global _STALE_WARNED
+    if _STALE_WARNED:
+        return
+    disk = stale_install()
+    if disk:
+        _STALE_WARNED = True
+        logger.warning("CMI %s is installed but this process still runs %s: restart Hermes to load it",
+                       disk, running_version())
 
 from .toolcalls import (  # noqa: F401 (re-exported: tests and plugins import them from here)
     _ID_TOKEN_RE, CMI_L1_MIN_PCT, CMI_L1_MAX_PCT, CMI_L2_MAX_PCT, CMI_L3_MAX_PCT, USER_TURN_WINDOW,
@@ -381,6 +396,7 @@ class CMIEngine(ContextEngine):
     def on_session_start(self, session_id: str, **kwargs: Any) -> None:
         from pathlib import Path
 
+        _warn_if_stale_install()
         project_id = kwargs.get("project_id", os.environ.get("CMI_PROJECT_ID"))
         project_home = kwargs.get("hermes_home")
         inherited_anchor = self._auto_binding_session_id or self._session_id
@@ -2202,6 +2218,8 @@ class CMIEngine(ContextEngine):
     def get_status(self) -> Dict[str, Any]:
         base = super().get_status()
         base["cmi"] = {
+            "version": running_version(),
+            "installed_version": stale_install(),  # None unless a newer/other CMI waits for a restart
             "capabilities": self.capabilities.as_dict() if self.capabilities else None,
             "telemetry": dict(self.telemetry),
             "working_set_top": self.working_set.top(10),

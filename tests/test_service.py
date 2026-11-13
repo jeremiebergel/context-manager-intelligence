@@ -78,6 +78,20 @@ def test_handwritten_equivalent_vscode_setting_counts_as_wired(tmp_path):
     assert service.vscode_remove(hand) == (hand, False)  # never removes what the user wrote
 
 
+def test_status_flags_a_proxy_still_running_older_code(tmp_path, monkeypatch):
+    """An upgrade replaces the files, not the running proxy: status says which version runs."""
+    import cmi
+    monkeypatch.setattr(service, "health", lambda port, timeout=2.0: {"ok": True, "sessions": 2, "version": cmi.__version__})
+    st = service.status(port=8787, home=tmp_path, plat="darwin")
+    assert f"version: {cmi.__version__}" in st and not any("WARNING" in x for x in st)
+    monkeypatch.setattr(service, "health", lambda port, timeout=2.0: {"ok": True, "sessions": 2, "version": "1.0.0"})
+    for plat, how in (("darwin", "launchctl kickstart -k"), ("linux", "systemctl --user restart"), ("win32", "sign out")):
+        warn = [x for x in service.status(port=8787, home=tmp_path, plat=plat, manage=False) if "still runs" in x]
+        assert len(warn) == 1 and "1.0.0" in warn[0] and cmi.__version__ in warn[0] and how in warn[0]
+    monkeypatch.setattr(service, "health", lambda port, timeout=2.0: {"ok": True, "sessions": 0})  # <= 1.12.3
+    assert any("older than 1.12.4" in x for x in service.status(port=8787, home=tmp_path, plat="darwin"))
+
+
 # ---- Linux / Windows (service manager mocked) ---------------------------------------------------
 class FakeRun:
     """Records every command; `fail` maps a command prefix (tuple) to (returncode, stderr)."""

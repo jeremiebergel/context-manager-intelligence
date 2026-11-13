@@ -6,6 +6,7 @@ can write at once without a lock. ``report()`` aggregates it for the ``/cmi`` co
 from __future__ import annotations
 
 from . import _fs
+from .versioning import running_version, stale_install
 
 import json
 import os
@@ -28,7 +29,8 @@ class StatsLedger:
         if self.path is None or requests <= 0:
             return
         line = json.dumps({"t": int(time.time()), "s": session_id or "", "m": model or "", "p": provider or "", "raw": int(raw),
-                           "out": int(compiled), "n": int(requests), "rc": int(recalls), "lx": int(lexical), "cr": round(cost_raw), "cc": round(cost_cmi)},
+                           "out": int(compiled), "n": int(requests), "rc": int(recalls), "lx": int(lexical), "cr": round(cost_raw), "cc": round(cost_cmi),
+                           "v": running_version()},
                           separators=(",", ":")) + "\n"
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,14 +86,18 @@ def _fmt_tokens(n: float) -> str:
 
 _TEXT = {
     "en": dict(session="This session", today="Today", d7="Last 7 days", d30="Last 30 days",
-               title="**CMI — context savings**",
+               title="**CMI {v} — context savings**",
+               stale="⚠️ CMI {disk} is installed, but this process still runs {run}: restart Hermes to load it "
+                     "(gateway and desktop app: `hermes gateway restart`).",
                head="| Period | Requests | Tokens without CMI | Saved | Real cost without → with CMI* |",
                partial=" (partial)", unknown="price unknown",
                recalls="Recalls over 7 days: {rc} via `cmi_recall`, {lx} anticipated (no tool call).",
                note="*Input cost simulated request by request with the provider's cache (read/write at the "
                     "model's public price), with and without CMI. On a subscription, the difference is extra quota."),
     "fr": dict(session="Cette session", today="Aujourd'hui", d7="7 derniers jours", d30="30 derniers jours",
-               title="**CMI — économies de contexte**",
+               title="**CMI {v} — économies de contexte**",
+               stale="⚠️ CMI {disk} est installé, mais ce processus exécute encore la {run} : redémarre Hermes "
+                     "pour la charger (passerelle et app desktop : `hermes gateway restart`).",
                head="| Période | Requêtes | Tokens sans CMI | Économisés | Coût réel sans → avec CMI* |",
                partial=" (partiel)", unknown="prix inconnu",
                recalls="Rappels sur 7 jours : {rc} via `cmi_recall`, {lx} anticipés (sans appel d'outil).",
@@ -115,7 +121,10 @@ def report(ledger: StatsLedger, current_session: str = "", live: Optional[Dict[s
                ("d30", lambda r: r.get("t", 0) >= now - 30 * 86400)]
     rows = list(ledger.rows())
     prices: Dict[tuple, Optional[float]] = {}
-    lines = [T["title"], "", T["head"], "|---|---|---|---|---|"]
+    lines = [T["title"].format(v=running_version()), "", T["head"], "|---|---|---|---|---|"]
+    disk = stale_install()
+    if disk:
+        lines[1:1] = ["", T["stale"].format(disk=disk, run=running_version())]
     for key, keep in windows:
         label = T[key]
         sel = [r for r in rows if keep(r)]

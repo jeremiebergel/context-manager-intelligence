@@ -36,6 +36,16 @@ def test_loopback_host_and_token_accepted(srv):
     assert _req(srv, "/cmi-health", {"x-cmi-token": "s3cret"}) == 200
 
 
+def test_health_reports_the_running_version(srv):
+    import json
+    import cmi
+    c = http.client.HTTPConnection("127.0.0.1", srv.server_port, timeout=5)
+    c.request("GET", "/cmi-health", headers={"x-cmi-token": "s3cret"})
+    body = json.loads(c.getresponse().read())
+    c.close()
+    assert body["ok"] is True and body["version"] == cmi.__version__
+
+
 def test_rebound_host_refused(srv):
     # a web page on evil.example resolving to 127.0.0.1 sends its own name as Host
     assert _req(srv, "/cmi-health", {"Host": "evil.example", "x-cmi-token": "s3cret"}) == 403

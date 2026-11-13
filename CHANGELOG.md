@@ -2,6 +2,18 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.4 (2026-11-13)
+
+- Shows which CMI is actually running. An update replaces the files on disk, but a process that already
+  loaded CMI (Hermes gateway and desktop app, a long CLI session, `cmi-proxy`) keeps the old code until
+  it restarts, and nothing showed it: sessions ran the previous engine for hours after an update (with
+  its longer start-up phase, they saved nothing below 100 requests). Now each savings-ledger row records
+  the version that produced it (`"v"`), `/cmi` names the running version and warns when another one is
+  installed (with the restart command), Hermes logs it once per process, `get_status()` reports
+  `version` and `installed_version`, `/cmi-health` returns the proxy's `version`, and
+  `cmi-proxy status` warns when the running proxy is older than the installed package, with the
+  restart command for the platform.
+
 ## 1.12.3 (2026-11-13)
 
 - Project memory: `cmi_project_get` on a revised topic also lists its earlier revisions (id, revision,

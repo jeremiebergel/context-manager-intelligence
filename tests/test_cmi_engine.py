@@ -1031,6 +1031,32 @@ def test_49_savings_ledger_and_report(tmp_path):
     assert rows[0]["cr"] > 0 and rows[0]["cc"] > 0
 
 
+def test_49b_ledger_row_records_the_running_version(tmp_path, monkeypatch):
+    """Each ledger row says which CMI ran it, and /cmi says when the files on disk are another
+    version: an update without a restart kept old code running for hours, unseen (2026-11-11)."""
+    import cmi
+    from cmi import versioning
+    from cmi.stats import StatsLedger, report
+    led = StatsLedger(tmp_path / "cmi_stats.jsonl")
+    led.add("s1", "m", 100, 60, 1)
+    assert list(led.rows())[0]["v"] == cmi.__version__
+    text = report(led, "s1")
+    assert f"CMI {cmi.__version__}" in text and "restart" not in text
+    disk = tmp_path / "__init__.py"
+    disk.write_text('"""doc"""\n__version__ = "9.9.9"\n', encoding="utf-8")
+    monkeypatch.setattr(versioning, "_INIT", disk)
+    assert versioning.stale_install() == "9.9.9"
+    text = report(led, "s1")
+    assert f"CMI 9.9.9 is installed, but this process still runs {cmi.__version__}" in text
+    assert "hermes gateway restart" in text and "This session | 1 |" in text
+    assert "9.9.9 est installé" in report(led, "s1", lang="fr")
+    from cmi.engine import CMIEngine
+    st = CMIEngine().get_status()["cmi"]
+    assert st["version"] == cmi.__version__ and st["installed_version"] == "9.9.9"
+    monkeypatch.setattr(versioning, "_INIT", tmp_path / "missing.py")  # unreadable: never a false alarm
+    assert versioning.stale_install() is None and "restart" not in report(led, "s1")
+
+
 def _run_session(commands, outputs, turns_after=4):
     msgs = [{"role": "system", "content": "sys"}]
     for t, (cmd, out) in enumerate(zip(commands, outputs)):
