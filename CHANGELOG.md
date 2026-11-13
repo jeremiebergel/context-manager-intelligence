@@ -2,6 +2,18 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.3 (2026-11-13)
+
+- Project memory: `cmi_project_get` on a revised topic also lists its earlier revisions (id, revision,
+  model, date, first 200 characters; at most 10: the last ones, or those around an older revision being
+  opened plus the current one), so a model can read what a decision was before it
+  changed and open any of them in full. A topic with one revision is unchanged. Checked live: a decision
+  saved in Claude, reversed in a new Claude session, then a new GPT session quoted the original word for
+  word and named the model that saved it (it opened revision 1 from the list).
+- `bench/project_live_reversal.py`: live gate for that scenario (decide in Claude, reverse, read in GPT).
+  `bench/project_live.py` resolves provider credentials like the Hermes CLI and binds the project
+  explicitly (it could no longer reach Anthropic, and project memory stayed off during the run).
+
 ## 1.12.2 (2026-11-12)
 
 - Safety, third barrier: a write that went through with CMI's short form as its payload is flagged in

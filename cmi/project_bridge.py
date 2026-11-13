@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 from .decision_candidates import find_candidates
@@ -156,7 +157,8 @@ class ProjectBridge:
                         cues={"type": "array", "maxItems": 5, "items": string,
                               "description": "2-3 other ways the fact might be worded (synonyms, other language); each is searched strictly and merged"}),
                    ["query"]),
-            schema("cmi_project_get", "Inspect a project record, including whether it is superseded. "
+            schema("cmi_project_get", "Inspect a project record, including whether it is superseded; "
+                   "a revised topic also lists its earlier revisions (ids you can open). "
                    "Optional exact evidence is paginated; follow next_offset to see the rest.",
                    dict(id=string, include_evidence={"type": "boolean"},
                         offset={"type": "integer", "minimum": 0}), ["id"]),
@@ -208,7 +210,7 @@ class ProjectBridge:
                 note = ({"warning": "approximate matches: only some of your words were found; check the snippet "
                                     "before relying on it"} if any(h.get("match") for h in hits) else {})
                 return {"results": rows, **note,
-                        "next": "cmi_project_get(id) returns the claim and optional evidence",
+                        "next": "cmi_project_get(id) returns the claim, optional evidence and earlier revisions",
                         "request_guidance": _REQUEST_GUIDANCE}
             if name == "cmi_project_get":
                 hit = self.memory.get(self.project, args.get("id"), include_evidence=bool(args.get("include_evidence")))
@@ -222,6 +224,7 @@ class ProjectBridge:
                     hit["evidence"] = evidence[offset:offset + 12000]
                     hit["evidence_total_chars"] = len(evidence)
                     hit["next_offset"] = offset + 12000 if offset + 12000 < len(evidence) else None
+                hit.update(self._revisions(hit["topic"], hit["revision"]))
                 return dict(hit, request_guidance=_REQUEST_GUIDANCE)
             raise ValueError("Unknown project memory tool")
         except (ValueError, TypeError) as error:
@@ -234,6 +237,31 @@ class ProjectBridge:
         except sqlite3.OperationalError as error:
             logger.warning("CMI project tool database operation failed", exc_info=True)
             return {"error": str(error)}
+
+    _MAX_REVISIONS = 10
+
+    def _revisions(self, topic, opened=None):
+        """Every revision of a revised topic, oldest first, so a model can read what a decision was
+        before it changed (each id opens in full with cmi_project_get). Nothing for a topic with one
+        revision. Bounded to 10 revisions, each text cut at 200 characters: the last 10, or, when an
+        older revision is opened, the revisions around it plus the current one."""
+        history = self.memory.history(self.project, topic)
+        if len(history) < 2:
+            return {}
+        last = history[-1]["revision"]
+        n = self._MAX_REVISIONS
+        at = next((i for i, e in enumerate(history) if e["revision"] == opened), len(history) - 1)
+        if at >= len(history) - n:
+            shown = history[-n:]
+        else:
+            start = max(0, at - (n - 1) // 2)
+            shown = history[start:start + n - 1] + [history[-1]]
+        rows = [dict(id=e["id"], revision=e["revision"], current=e["revision"] == last,
+                     model=e["model"], date=time.strftime("%Y-%m-%d %H:%M", time.localtime(e["ts"])),
+                     text=e["text"] if len(e["text"]) <= 200 else e["text"][:200] + "…")
+                for e in shown]
+        extra = len(history) - len(shown)
+        return dict(revisions=rows, **({"revisions_omitted": extra} if extra else {}))
 
     _NUDGE = ("[CMI project memory] If the user's last message confirms a durable decision or rule "
               "(a choice between options, not a go-ahead on an action), publish it now with "

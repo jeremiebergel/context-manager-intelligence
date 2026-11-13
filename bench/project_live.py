@@ -22,13 +22,18 @@ model = sys.argv[3] if len(sys.argv) > 3 else "gpt-6.1-sol"
 provider = sys.argv[4] if len(sys.argv) > 4 else "openai-codex"
 project = "cmi-live-pilot" if phase != "isolation" else "unrelated-project"
 sid = "cmi_project_" + phase + "_" + uuid.uuid4().hex[:10]
-agent = AIAgent(model=model, provider=provider, platform="tool", quiet_mode=True,
+# Resolve credentials the way the Hermes CLI does (Anthropic needs it; Codex resolves itself).
+from hermes_cli.runtime_provider import resolve_runtime_provider  # noqa: E402
+runtime = resolve_runtime_provider(requested=provider, target_model=model)
+agent = AIAgent(model=model, provider=runtime.get("provider", provider), api_key=runtime.get("api_key"),
+                base_url=runtime.get("base_url"), api_mode=runtime.get("api_mode"),
+                platform="tool", quiet_mode=True,
                 enabled_toolsets=["context_engine"], skip_memory=True, skip_context_files=True,
                 skip_background_review=True, session_id=sid, max_iterations=5,
                 run_budget_seconds=100, save_trajectories=False,
                 reasoning_config={"enabled": True, "effort": "low"})
 old = agent.context_compressor
-engine = CMIEngine()
+engine = CMIEngine(auto_project_binding=False)  # explicit binding: no Hermes host session row here
 engine.on_session_start(sid, hermes_home=str(root), project_id=project)
 engine.update_model(model=model, provider=provider,
                     context_length=getattr(old, "context_length", 200000) or 200000)

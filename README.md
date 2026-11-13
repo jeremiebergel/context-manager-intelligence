@@ -192,7 +192,7 @@ macOS, a systemd user unit on Linux (install, restart after a crash and uninstal
 logon Scheduled Task on Windows (install round trip run in Windows CI as an administrator; the no-admin case is not verified yet); see
 [docs/REFERENCE.md](docs/REFERENCE.md#install). Windows is covered by the test suite in CI on every push
 (project memory included; file privacy relies on the NTFS permissions of your user profile instead of POSIX
-modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.12.2**; the context engine and proxy are the supported scope.
+modes). Not tested: Cursor, Windsurf, Copilot, the extensions' own UI. Status: **1.12.3**; the context engine and proxy are the supported scope.
 
 ## Project memory across sessions and models *(experimental, on by default in Hermes)*
 
