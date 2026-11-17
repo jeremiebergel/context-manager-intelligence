@@ -178,8 +178,10 @@ def _responses(body: Dict[str, Any]) -> Tuple[Canon, Back]:
                     new[a] = {**new[a], "output": [{"type": "input_text", "text": got}]}
                     changed = True
                 continue
-            # assistant: narration text and/or call payloads
-            if a >= 0 and out[c].get("content") != canon[c].get("content") and isinstance(out[c].get("content"), str):
+            # assistant: narration text and/or call payloads. Removed narration ("") keeps the
+            # original message item: an empty output_text is not a safe Responses shape.
+            if a >= 0 and out[c].get("content") != canon[c].get("content") and isinstance(out[c].get("content"), str) \
+                    and out[c]["content"]:
                 new[a] = {**new[a], "content": [{"type": "output_text", "text": out[c]["content"], "annotations": []}]}
                 changed = True
             for tc_old, tc_new, idx in zip(canon[c].get("tool_calls") or [], out[c].get("tool_calls") or [], b):

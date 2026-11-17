@@ -120,6 +120,25 @@ def _responses_body():
             "include": ["reasoning.encrypted_content"]}
 
 
+def test_w4b_responses_removed_narration_keeps_the_message_item():
+    """An empty output_text is not a safe Responses shape: when the engine removes old
+    narration, the original assistant message item goes back unchanged."""
+    from cmi import wire
+    items = [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "go"}]},
+             {"type": "message", "role": "assistant",
+              "content": [{"type": "output_text", "text": "Let me read the file first.", "annotations": []}]},
+             {"type": "function_call", "call_id": "c1", "name": "shell", "arguments": "{\"cmd\": \"ls\"}"},
+             {"type": "function_call_output", "call_id": "c1", "output": "a\nb"}]
+    body = {"model": "m", "input": items}
+    canon, back = wire.to_canonical("responses", body)
+    out = copy.deepcopy(canon)
+    out[1]["content"] = ""
+    assert back(out) is None  # nothing else changed: no write-back at all
+    out[2]["content"] = "a"
+    new = back(out)
+    assert new is not None and new["input"][1] == items[1]
+
+
 def test_w4_responses_shortens_old_output_keeps_reasoning(tmp_path):
     body = _responses_body()
     orig = copy.deepcopy(body)

@@ -1983,28 +1983,25 @@ class CMIEngine(ContextEngine):
             if not ToolResultLifecycle.is_narration_profitable(text):
                 continue
             instance_id = f"narr:{i}"
-            ref = self._stash(text)
-            if ref is None:
-                continue
-            stub = self.lifecycle.render_narration_stub(instance_id, original=text, ref=ref)
-            if len(stub) >= len(text):
-                continue
+            # The lead-in prose is removed outright: no stub, no key. A visible stub
+            # ("[CMI: narration omitted] cmi:KEY anchor…") was copied by models as their own
+            # reply text, with invented keys (13 times in 5 sessions). The prose only announces
+            # the tool call next to it, so nothing worth recalling is lost; the host keeps the
+            # full transcript.
+            content = m.get("content")
+            parts: List[Any] = []
+            if isinstance(content, list):
+                parts = [p for p in content if not (isinstance(p, dict) and p.get("type") == "text")]
+                if not parts:  # never leave an assistant turn with no block at all
+                    continue
             out = self._cow(out, msgs, i)
             target = out[i]
             if isinstance(target.get("content"), str):
-                target["content"] = stub
+                target["content"] = ""
             elif isinstance(target.get("content"), list):
-                new_parts = []
-                replaced = False
-                for part in target["content"]:
-                    if isinstance(part, dict) and part.get("type") == "text" and not replaced:
-                        new_parts.append({"type": "text", "text": stub})
-                        replaced = True
-                    else:
-                        new_parts.append(part)
-                target["content"] = new_parts
+                target["content"] = parts
             self.lifecycle.record_state(instance_id, "narr_done")
-            self._telemetry_degrade("assistant_narration", text, stub, False)
+            self._telemetry_degrade("assistant_narration", text, "", False)
         return out
 
     def _ensure_store_root(self) -> None:

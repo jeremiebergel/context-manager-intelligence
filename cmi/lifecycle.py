@@ -95,7 +95,6 @@ BATCH_MAX_CONTENT_ECHO: int = 40     # chars of result preview kept per batch it
 # text-only answer (no tool_calls) is NEVER touched — only text attached to
 # an action, never a standalone reply.
 NARRATION_MIN_CHARS: int = 40        # below this, nothing to gain
-NARRATION_MAX_KEEP_CHARS: int = 20   # tiny anchor kept ("[...]") for readability
 
 
 def _tokens_rough(text: Any) -> int:
@@ -521,17 +520,8 @@ class ToolResultLifecycle:
         return text
 
     # -- Assistant narration (v1.1) --------------------------------------------
+    # Since 1.12.5 old lead-in prose is removed outright by the engine (no stub to imitate).
 
     @staticmethod
     def is_narration_profitable(text: str) -> bool:
         return len(text or "") >= NARRATION_MIN_CHARS
-
-    def render_narration_stub(self, instance_id: str, *, original: str, ref: str = "") -> str:
-        cache_key = _ck(f"narr:{instance_id}", original, ref)
-        cached = self._digest_cache.get(cache_key)
-        if cached is not None:
-            return cached
-        anchor = (original or "")[:NARRATION_MAX_KEEP_CHARS].rstrip()
-        text = f"[CMI: narration omitted]{ref} {anchor}…" if anchor else f"[CMI: narration omitted]{ref}"
-        self._digest_cache[cache_key] = text
-        return text

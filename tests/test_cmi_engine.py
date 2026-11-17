@@ -527,7 +527,44 @@ def test_24_same_history_same_output_every_call():
     msgs = _narrated_history()
     outs = [json.dumps(e.select_context(msgs) or msgs, sort_keys=True) for _ in range(4)]
     assert len(set(outs)) == 1
-    assert "[CMI: narration omitted]" in outs[0]
+    assert "Let me look at the file for turn 1 " not in outs[0]  # old narration removed
+
+
+def test_24b_old_narration_removed_without_a_stub_to_imitate():
+    """Old lead-in prose next to a tool call is removed, not replaced by a visible stub: models
+    copied the stub ("[CMI: narration omitted] cmi:KEY ...") as their own reply text with invented
+    keys. Tool calls, recent narration and standalone replies are untouched."""
+    e = make_engine()
+    msgs = _narrated_history()
+    out = e.select_context(msgs)
+    assert out is not None
+    wire = json.dumps(out)
+    assert "narration omitted" not in wire and "[CMI: narration" not in wire
+    old = out[2]  # turn 1 assistant with a tool call
+    assert old["content"] == "" and old["tool_calls"] == msgs[2]["tool_calls"]
+    assert out[-3]["content"] == msgs[-3]["content"]  # newest narration kept
+    assert all(o["content"] == m["content"] for o, m in zip(out, msgs)
+               if m["role"] == "assistant" and not m.get("tool_calls"))  # standalone replies kept
+
+
+def test_24c_old_narration_list_content_drops_text_keeps_tool_use():
+    """Anthropic-shaped assistant content: the text block goes, tool_use (and thinking) stay
+    byte-identical; a message that would end up with no block is left alone."""
+    e = make_engine()
+    msgs: list = [{"role": "system", "content": "sys"}]
+    for t in range(1, 10):
+        msgs.append({"role": "user", "content": f"turn {t}"})
+        msgs.append({"role": "assistant", "content": [
+            {"type": "thinking", "thinking": "hm", "signature": "sig"},
+            {"type": "text", "text": f"Now I will read the module for turn {t} and see what changed."},
+            {"type": "tool_use", "id": f"tu_{t}", "name": "read_file", "input": {"path": f"f{t}.py"}}]})
+        msgs.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": f"tu_{t}",
+                                                  "content": "x = 1\n" * 50}]})
+        msgs.append({"role": "assistant", "content": f"done {t}"})
+    out = e.select_context(msgs) or msgs
+    first = out[2]["content"]
+    assert [p["type"] for p in first] == ["thinking", "tool_use"]
+    assert first[0] == msgs[2]["content"][0] and first[1] == msgs[2]["content"][2]
 
 
 def test_25_input_never_mutated_and_untouched_messages_shared():

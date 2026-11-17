@@ -2,6 +2,17 @@
 
 Unreleased work is listed first. Dates are YYYY-MM-DD.
 
+## 1.12.5 (2026-11-17)
+
+- Old narration is removed instead of stubbed. The short text an agent writes before a tool call
+  ("Let me read the config first…") used to become `[CMI: narration omitted] cmi:KEY anchor…` once it
+  was old. Models sometimes copied that line as their own reply, with an invented key, so the user saw
+  a raw CMI marker (13 times in 5 sessions since September, mostly Claude Sonnet). That text now goes
+  entirely: the tool call, recent narration and every reply without a tool call stay as they were.
+  On the OpenAI Responses route (Codex) the message item is left unchanged, since an empty
+  `output_text` is not a safe shape there. The narration is no longer stored for `cmi_recall`; the
+  host keeps the full transcript.
+
 ## 1.12.4 (2026-11-13)
 
 - Shows which CMI is actually running. An update replaces the files on disk, but a process that already
